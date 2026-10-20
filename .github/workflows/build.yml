@@ -1,1 +1,408 @@
+name: Build Speaker Cleaner Pro APK
 
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Create Flutter Project
+        run: |
+          flutter create --platforms=android --org com.soundx.cleaner app
+
+      - name: Create App UI
+        working-directory: app
+        run: |
+          cat > lib/main.dart <<'EOF'
+          import 'package:flutter/material.dart';
+          import 'package:flutter/services.dart';
+
+          void main() {
+            runApp(const SpeakerCleanerApp());
+          }
+
+          class SpeakerCleanerApp extends StatelessWidget {
+            const SpeakerCleanerApp({super.key});
+
+            @override
+            Widget build(BuildContext context) {
+              return MaterialApp(
+                debugShowCheckedModeBanner: false,
+                title: 'Speaker Cleaner Pro',
+                theme: ThemeData(
+                  brightness: Brightness.dark,
+                  scaffoldBackgroundColor: const Color(0xFF10131D),
+                  colorScheme: ColorScheme.fromSeed(
+                    seedColor: const Color(0xFF00E5FF),
+                    brightness: Brightness.dark,
+                  ),
+                  useMaterial3: true,
+                ),
+                home: const HomeScreen(),
+              );
+            }
+          }
+
+          class HomeScreen extends StatefulWidget {
+            const HomeScreen({super.key});
+
+            @override
+            State<HomeScreen> createState() => _HomeScreenState();
+          }
+
+          class _HomeScreenState extends State<HomeScreen> {
+            static const platform = MethodChannel('speaker_cleaner/audio');
+
+            bool isPlaying = false;
+            double frequency = 150;
+            String status = 'Ready to test';
+
+            Future<void> startTone() async {
+              try {
+                await platform.invokeMethod('startTone', {
+                  'frequency': frequency,
+                });
+                setState(() {
+                  isPlaying = true;
+                  status = 'Sound test running';
+                });
+              } on PlatformException {
+                setState(() {
+                  status = 'Unable to play sound';
+                });
+              }
+            }
+
+            Future<void> stopTone() async {
+              try {
+                await platform.invokeMethod('stopTone');
+              } catch (_) {}
+
+              if (!mounted) return;
+              setState(() {
+                isPlaying = false;
+                status = 'Ready to test';
+              });
+            }
+
+            @override
+            void dispose() {
+              platform.invokeMethod('stopTone').catchError((_) {});
+              super.dispose();
+            }
+
+            Widget featureCard(
+              IconData icon,
+              String title,
+              String subtitle,
+              VoidCallback onTap,
+            ) {
+              return Card(
+                color: const Color(0xFF1B2030),
+                child: ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: const Color(0xFF26394A),
+                    child: Icon(icon, color: const Color(0xFF00E5FF)),
+                  ),
+                  title: Text(
+                    title,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  subtitle: Text(subtitle),
+                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                  onTap: onTap,
+                ),
+              );
+            }
+
+            @override
+            Widget build(BuildContext context) {
+              return Scaffold(
+                appBar: AppBar(
+                  title: const Text(
+                    'Speaker Cleaner Pro',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  centerTitle: true,
+                ),
+                body: SafeArea(
+                  child: ListView(
+                    padding: const EdgeInsets.all(20),
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(24),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [
+                              Color(0xFF18384B),
+                              Color(0xFF20213C),
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(28),
+                        ),
+                        child: Column(
+                          children: [
+                            const Icon(
+                              Icons.graphic_eq,
+                              size: 72,
+                              color: Color(0xFF00E5FF),
+                            ),
+                            const SizedBox(height: 12),
+                            const Text(
+                              'Sound Check',
+                              style: TextStyle(
+                                fontSize: 25,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(status),
+                            const SizedBox(height: 20),
+                            Text(
+                              '${frequency.round()} Hz',
+                              style: const TextStyle(
+                                fontSize: 30,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Slider(
+                              value: frequency,
+                              min: 100,
+                              max: 1000,
+                              divisions: 18,
+                              onChanged: isPlaying
+                                  ? null
+                                  : (value) {
+                                      setState(() {
+                                        frequency = value;
+                                      });
+                                    },
+                            ),
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              width: double.infinity,
+                              height: 54,
+                              child: FilledButton.icon(
+                                onPressed: isPlaying ? stopTone : startTone,
+                                icon: Icon(
+                                  isPlaying
+                                      ? Icons.stop
+                                      : Icons.play_arrow,
+                                ),
+                                label: Text(
+                                  isPlaying ? 'STOP SOUND' : 'START TEST',
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      const Text(
+                        'TOOLS',
+                        style: TextStyle(
+                          color: Color(0xFF00E5FF),
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 2,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      featureCard(
+                        Icons.volume_up,
+                        'Speaker Test',
+                        'Check audio output with a test tone',
+                        () {
+                          setState(() {
+                            status = 'Select START TEST above';
+                          });
+                        },
+                      ),
+                      featureCard(
+                        Icons.cleaning_services,
+                        'Speaker Cleaner',
+                        'Play sound that may help dislodge moisture',
+                        () {
+                          setState(() {
+                            frequency = 150;
+                            status = 'Use a moderate volume';
+                          });
+                        },
+                      ),
+                      featureCard(
+                        Icons.info_outline,
+                        'About',
+                        'Simple sound testing utility',
+                        () {
+                          showAboutDialog(
+                            context: context,
+                            applicationName: 'Speaker Cleaner Pro',
+                            applicationVersion: '1.0.0',
+                            applicationLegalese:
+                                'Sound cannot guarantee water removal.',
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Safety: Keep volume moderate. This app cannot '
+                        'measure speaker quality or guarantee moisture removal.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Colors.white60,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
+          }
+          EOF
+
+      - name: Configure Android Audio
+        working-directory: app
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path("android/app/src/main/AndroidManifest.xml")
+          s = p.read_text()
+          s = s.replace(
+              '<application',
+              '<uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>\\n    <application',
+              1
+          )
+          p.write_text(s)
+
+          p = Path("android/app/src/main/kotlin/com/soundx/cleaner/app/MainActivity.kt")
+          p.parent.mkdir(parents=True, exist_ok=True)
+          p.write_text('''package com.soundx.cleaner.app
+
+          import android.media.AudioFormat
+          import android.media.AudioManager
+          import android.media.AudioTrack
+          import kotlin.math.PI
+          import kotlin.math.sin
+          import kotlin.concurrent.thread
+          import io.flutter.embedding.android.FlutterActivity
+          import io.flutter.embedding.engine.FlutterEngine
+          import io.flutter.plugin.common.MethodChannel
+
+          class MainActivity : FlutterActivity() {
+              private val channelName = "speaker_cleaner/audio"
+              private var audioTrack: AudioTrack? = null
+              @Volatile private var running = false
+
+              override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
+                  super.configureFlutterEngine(flutterEngine)
+                  MethodChannel(flutterEngine.dartExecutor.binaryMessenger, channelName)
+                      .setMethodCallHandler { call, result ->
+                          when (call.method) {
+                              "startTone" -> {
+                                  val frequency = (call.argument<Number>("frequency")
+                                      ?.toDouble() ?: 150.0).coerceIn(100.0, 1000.0)
+                                  stopAudio()
+                                  startAudio(frequency)
+                                  result.success(null)
+                              }
+                              "stopTone" -> {
+                                  stopAudio()
+                                  result.success(null)
+                              }
+                              else -> result.notImplemented()
+                          }
+                      }
+              }
+
+              private fun startAudio(frequency: Double) {
+                  val sampleRate = 44100
+                  val bufferSize = AudioTrack.getMinBufferSize(
+                      sampleRate,
+                      AudioFormat.CHANNEL_OUT_MONO,
+                      AudioFormat.ENCODING_PCM_16BIT
+                  ).coerceAtLeast(2048)
+
+                  val track = AudioTrack(
+                      AudioManager.STREAM_MUSIC,
+                      sampleRate,
+                      AudioFormat.CHANNEL_OUT_MONO,
+                      AudioFormat.ENCODING_PCM_16BIT,
+                      bufferSize,
+                      AudioTrack.MODE_STREAM
+                  )
+                  audioTrack = track
+                  running = true
+                  track.play()
+
+                  thread {
+                      val buffer = ShortArray(1024)
+                      var phase = 0.0
+                      val step = 2.0 * PI * frequency / sampleRate
+                      while (running) {
+                          for (i in buffer.indices) {
+                              buffer[i] = (sin(phase) * 5000).toInt().toShort()
+                              phase += step
+                              if (phase >= 2.0 * PI) phase -= 2.0 * PI
+                          }
+                          if (running) track.write(buffer, 0, buffer.size)
+                      }
+                  }
+              }
+
+              private fun stopAudio() {
+                  running = false
+                  try {
+                      audioTrack?.pause()
+                      audioTrack?.flush()
+                      audioTrack?.release()
+                  } catch (_: Exception) {}
+                  audioTrack = null
+              }
+
+              override fun onDestroy() {
+                  stopAudio()
+                  super.onDestroy()
+              }
+          }
+          '''.replace(
+              'package com.soundx.cleaner.app',
+              'package com.soundx.cleaner.app'
+          ))
+          PY
+
+      - name: Build APK
+        working-directory: app
+        run: |
+          flutter pub get
+          flutter build apk --release
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: speaker-cleaner-pro-apk
+          path: app/build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
