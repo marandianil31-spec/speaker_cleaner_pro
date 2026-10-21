@@ -1,0 +1,628 @@
+name: Build Speaker Cleaner Pro with AdMob
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Create Flutter Project
+        run: flutter create --platforms=android --org com.soundx.cleaner app
+
+      - name: Add Google Mobile Ads SDK
+        working-directory: app
+        run: flutter pub add google_mobile_ads
+
+      - name: Create Flutter UI with Banner Ad
+        working-directory: app
+        shell: bash
+        run: |
+          cat > lib/main.dart <<'DART'
+          import 'dart:async';
+          import 'package:flutter/material.dart';
+          import 'package:flutter/services.dart';
+          import 'package:google_mobile_ads/google_mobile_ads.dart';
+
+          Future<void> main() async {
+            WidgetsFlutterBinding.ensureInitialized();
+            await MobileAds.instance.initialize();
+            runApp(const SpeakerCleanerApp());
+          }
+
+          class SpeakerCleanerApp extends StatelessWidget {
+            const SpeakerCleanerApp({super.key});
+
+            @override
+            Widget build(BuildContext context) {
+              return MaterialApp(
+                debugShowCheckedModeBanner: false,
+                title: 'Speaker Cleaner Pro',
+                theme: ThemeData(
+                  useMaterial3: true,
+                  brightness: Brightness.dark,
+                  scaffoldBackgroundColor: const Color(0xFF10121C),
+                  colorScheme: ColorScheme.fromSeed(
+                    seedColor: const Color(0xFF00E5FF),
+                    brightness: Brightness.dark,
+                  ),
+                ),
+                home: const HomeScreen(),
+              );
+            }
+          }
+
+          class BottomBannerAd extends StatefulWidget {
+            const BottomBannerAd({super.key});
+
+            @override
+            State<BottomBannerAd> createState() => _BottomBannerAdState();
+          }
+
+          class _BottomBannerAdState extends State<BottomBannerAd> {
+            BannerAd? _banner;
+            bool _loaded = false;
+
+            // Your AdMob Banner Ad Unit ID.
+            static const String _bannerId =
+                'ca-app-pub-6724668039220554/8327166208';
+
+            @override
+            void initState() {
+              super.initState();
+              _banner = BannerAd(
+                adUnitId: _bannerId,
+                request: const AdRequest(),
+                size: AdSize.banner,
+                listener: BannerAdListener(
+                  onAdLoaded: (ad) {
+                    if (!mounted) {
+                      ad.dispose();
+                      return;
+                    }
+                    setState(() => _loaded = true);
+                  },
+                  onAdFailedToLoad: (ad, error) {
+                    ad.dispose();
+                    if (mounted) {
+                      setState(() {
+                        _banner = null;
+                        _loaded = false;
+                      });
+                    }
+                  },
+                ),
+              )..load();
+            }
+
+            @override
+            Widget build(BuildContext context) {
+              final banner = _banner;
+              if (!_loaded || banner == null) {
+                return const SizedBox.shrink();
+              }
+              return SafeArea(
+                top: false,
+                child: SizedBox(
+                  width: banner.size.width.toDouble(),
+                  height: banner.size.height.toDouble(),
+                  child: Center(child: AdWidget(ad: banner)),
+                ),
+              );
+            }
+
+            @override
+            void dispose() {
+              _banner?.dispose();
+              super.dispose();
+            }
+          }
+
+          class HomeScreen extends StatefulWidget {
+            const HomeScreen({super.key});
+
+            @override
+            State<HomeScreen> createState() => _HomeScreenState();
+          }
+
+          class _HomeScreenState extends State<HomeScreen>
+              with SingleTickerProviderStateMixin {
+            static const channel = MethodChannel('speaker_cleaner/audio');
+
+            bool playing = false;
+            bool vibrating = false;
+            double frequency = 150;
+            int duration = 30;
+            int remaining = 0;
+            String status = 'Ready to test';
+
+            Timer? timer;
+            late final AnimationController animation;
+
+            @override
+            void initState() {
+              super.initState();
+              animation = AnimationController(
+                vsync: this,
+                duration: const Duration(milliseconds: 700),
+              )..repeat(reverse: true);
+            }
+
+            Future<void> startSound() async {
+              timer?.cancel();
+              try {
+                await channel.invokeMethod('startTone', {
+                  'frequency': frequency,
+                });
+                if (!mounted) return;
+                setState(() {
+                  playing = true;
+                  remaining = duration;
+                  status = 'Sound test running';
+                });
+                timer = Timer.periodic(const Duration(seconds: 1), (t) {
+                  if (!mounted) {
+                    t.cancel();
+                  } else if (remaining <= 1) {
+                    stopSound();
+                  } else {
+                    setState(() => remaining--);
+                  }
+                });
+              } catch (_) {
+                if (!mounted) return;
+                setState(() {
+                  playing = false;
+                  status = 'Unable to play sound';
+                });
+              }
+            }
+
+            Future<void> stopSound() async {
+              timer?.cancel();
+              timer = null;
+              try {
+                await channel.invokeMethod('stopTone');
+              } catch (_) {}
+              if (!mounted) return;
+              setState(() {
+                playing = false;
+                remaining = 0;
+                status = 'Ready to test';
+              });
+            }
+
+            Future<void> runVibration(String mode) async {
+              if (vibrating) return;
+              setState(() {
+                vibrating = true;
+                status = mode == 'long'
+                    ? 'Long vibration test'
+                    : 'Pulse vibration test';
+              });
+              try {
+                await channel.invokeMethod('vibrate', {'mode': mode});
+              } catch (_) {
+                if (mounted) {
+                  setState(() => status = 'Vibration unavailable');
+                }
+              }
+              await Future.delayed(
+                Duration(milliseconds: mode == 'long' ? 2600 : 1400),
+              );
+              if (!mounted) return;
+              setState(() {
+                vibrating = false;
+                status = 'Ready to test';
+              });
+            }
+
+            Widget modeButton(String title, int hz, IconData icon) {
+              final selected = frequency == hz.toDouble();
+              return Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(16),
+                    onTap: playing
+                        ? null
+                        : () => setState(() {
+                              frequency = hz.toDouble();
+                              status = '$title mode selected';
+                            }),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      decoration: BoxDecoration(
+                        color: selected
+                            ? const Color(0xFF174353)
+                            : const Color(0xFF1B2030),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: selected
+                              ? const Color(0xFF00E5FF)
+                              : Colors.white12,
+                        ),
+                      ),
+                      child: Column(
+                        children: [
+                          Icon(icon, color: const Color(0xFF00E5FF)),
+                          const SizedBox(height: 6),
+                          Text(title, style: const TextStyle(fontSize: 12)),
+                          Text('$hz Hz',
+                              style: const TextStyle(
+                                  fontSize: 11, color: Colors.white60)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }
+
+            Widget toolCard(IconData icon, String title, String subtitle,
+                VoidCallback onTap) {
+              return Card(
+                color: const Color(0xFF1B2030),
+                margin: const EdgeInsets.only(bottom: 12),
+                child: ListTile(
+                  contentPadding: const EdgeInsets.all(12),
+                  leading: CircleAvatar(
+                    backgroundColor: const Color(0xFF26394A),
+                    child: Icon(icon, color: const Color(0xFF00E5FF)),
+                  ),
+                  title: Text(title,
+                      style: const TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: Text(subtitle),
+                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                  onTap: onTap,
+                ),
+              );
+            }
+
+            @override
+            void dispose() {
+              timer?.cancel();
+              channel.invokeMethod('stopTone').catchError((_) {});
+              animation.dispose();
+              super.dispose();
+            }
+
+            @override
+            Widget build(BuildContext context) {
+              return Scaffold(
+                appBar: AppBar(
+                  title: const Text('Speaker Cleaner Pro',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+                  centerTitle: true,
+                ),
+                body: SafeArea(
+                  child: ListView(
+                    padding: const EdgeInsets.all(18),
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(22),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(colors: [
+                            Color(0xFF18384B),
+                            Color(0xFF20213C),
+                          ]),
+                          borderRadius: BorderRadius.circular(28),
+                        ),
+                        child: Column(
+                          children: [
+                            AnimatedBuilder(
+                              animation: animation,
+                              builder: (context, child) => Transform.scale(
+                                scale: playing ? 1 + animation.value * 0.12 : 1,
+                                child: child,
+                              ),
+                              child: const Icon(Icons.graphic_eq,
+                                  size: 76, color: Color(0xFF00E5FF)),
+                            ),
+                            const SizedBox(height: 12),
+                            const Text('Sound Check',
+                                style: TextStyle(
+                                    fontSize: 26, fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 8),
+                            Text(status),
+                            const SizedBox(height: 18),
+                            Text('${frequency.round()} Hz',
+                                style: const TextStyle(
+                                    fontSize: 32, fontWeight: FontWeight.bold)),
+                            Slider(
+                              value: frequency,
+                              min: 100,
+                              max: 1000,
+                              divisions: 18,
+                              onChanged: playing
+                                  ? null
+                                  : (v) => setState(() => frequency = v),
+                            ),
+                            DropdownButtonFormField<int>(
+                              value: duration,
+                              decoration: const InputDecoration(
+                                  labelText: 'Auto Stop',
+                                  border: OutlineInputBorder()),
+                              items: const [
+                                DropdownMenuItem(
+                                    value: 30, child: Text('30 seconds')),
+                                DropdownMenuItem(
+                                    value: 60, child: Text('1 minute')),
+                                DropdownMenuItem(
+                                    value: 120, child: Text('2 minutes')),
+                              ],
+                              onChanged: playing
+                                  ? null
+                                  : (v) {
+                                      if (v != null) {
+                                        setState(() => duration = v);
+                                      }
+                                    },
+                            ),
+                            const SizedBox(height: 18),
+                            if (playing) Text('Stopping in $remaining seconds'),
+                            const SizedBox(height: 10),
+                            SizedBox(
+                              width: double.infinity,
+                              height: 54,
+                              child: FilledButton.icon(
+                                onPressed: playing ? stopSound : startSound,
+                                icon: Icon(playing ? Icons.stop : Icons.play_arrow),
+                                label: Text(playing ? 'STOP SOUND' : 'START TEST'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      const Text('SOUND MODES',
+                          style: TextStyle(
+                              color: Color(0xFF00E5FF),
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 2)),
+                      const SizedBox(height: 12),
+                      Row(children: [
+                        modeButton('Low', 150, Icons.graphic_eq),
+                        modeButton('Medium', 400, Icons.multitrack_audio),
+                        modeButton('High', 800, Icons.equalizer),
+                      ]),
+                      const SizedBox(height: 24),
+                      const Text('VIBRATION TEST',
+                          style: TextStyle(
+                              color: Color(0xFF00E5FF),
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 2)),
+                      const SizedBox(height: 12),
+                      toolCard(Icons.vibration, 'Long Vibration',
+                          'One continuous vibration',
+                          () => runVibration('long')),
+                      toolCard(Icons.vibration, 'Pulse Vibration',
+                          'Three short vibration pulses',
+                          () => runVibration('pulse')),
+                      toolCard(Icons.volume_up, 'Speaker Test',
+                          'Select 400 Hz and start the sound', () {
+                        if (playing) stopSound();
+                        setState(() {
+                          frequency = 400;
+                          status = 'Speaker test selected';
+                        });
+                      }),
+                      toolCard(Icons.cleaning_services, 'Speaker Cleaner',
+                          'Select 150 Hz and start the sound', () {
+                        if (playing) stopSound();
+                        setState(() {
+                          frequency = 150;
+                          status = 'Cleaner mode selected';
+                        });
+                      }),
+                      toolCard(Icons.info_outline, 'About',
+                          'Speaker Cleaner Pro v1.4 with ads', () {
+                        showAboutDialog(
+                          context: context,
+                          applicationName: 'Speaker Cleaner Pro',
+                          applicationVersion: '1.4.0',
+                          applicationLegalese:
+                              'Sound cannot guarantee water removal.',
+                        );
+                      }),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Safety: Keep volume moderate. Avoid prolonged loud sounds. '
+                        'Vibration patterns do not increase motor strength or guarantee moisture removal.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.white60, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+                bottomNavigationBar: const BottomBannerAd(),
+              );
+            }
+          }
+          DART
+
+      - name: Configure Android Manifest
+        working-directory: app
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("android/app/src/main/AndroidManifest.xml")
+          s = p.read_text()
+
+          permission = '    <uses-permission android:name="android.permission.VIBRATE"/>\n'
+          if "android.permission.VIBRATE" not in s:
+              s = s.replace("<application", permission + "    <application", 1)
+
+          app_id = "ca-app-pub-6724668039220554~5343191472"
+          meta = (
+              '        <meta-data\n'
+              '            android:name="com.google.android.gms.ads.APPLICATION_ID"\n'
+              f'            android:value="{app_id}"/>\n'
+          )
+          if "com.google.android.gms.ads.APPLICATION_ID" not in s:
+              s = s.replace("<application", "<application\n" + meta, 1)
+
+          p.write_text(s)
+          PY
+
+          mkdir -p android/app/src/main/kotlin/com/soundx/cleaner/app
+          cat > android/app/src/main/kotlin/com/soundx/cleaner/app/MainActivity.kt <<'KOTLIN'
+          package com.soundx.cleaner.app
+
+          import android.content.Context
+          import android.media.AudioAttributes
+          import android.media.AudioFormat
+          import android.media.AudioTrack
+          import android.os.Build
+          import android.os.VibrationEffect
+          import android.os.Vibrator
+          import android.os.VibratorManager
+          import io.flutter.embedding.android.FlutterActivity
+          import io.flutter.embedding.engine.FlutterEngine
+          import io.flutter.plugin.common.MethodChannel
+          import kotlin.concurrent.thread
+          import kotlin.math.PI
+          import kotlin.math.sin
+
+          class MainActivity : FlutterActivity() {
+              private val channelName = "speaker_cleaner/audio"
+              @Volatile private var running = false
+              private var audioTrack: AudioTrack? = null
+
+              override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
+                  super.configureFlutterEngine(flutterEngine)
+                  MethodChannel(flutterEngine.dartExecutor.binaryMessenger, channelName)
+                      .setMethodCallHandler { call, result ->
+                          when (call.method) {
+                              "startTone" -> {
+                                  val frequency = (call.argument<Number>("frequency")?.toDouble() ?: 150.0).coerceIn(100.0, 1000.0)
+                                  stopAudio()
+                                  startAudio(frequency)
+                                  result.success(null)
+                              }
+                              "stopTone" -> {
+                                  stopAudio()
+                                  result.success(null)
+                              }
+                              "vibrate" -> {
+                                  vibratePhone(call.argument<String>("mode") ?: "pulse")
+                                  result.success(null)
+                              }
+                              else -> result.notImplemented()
+                          }
+                      }
+              }
+
+              private fun startAudio(frequency: Double) {
+                  val rate = 44100
+                  val size = AudioTrack.getMinBufferSize(rate, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT).coerceAtLeast(2048)
+                  val track = AudioTrack.Builder()
+                      .setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build())
+                      .setAudioFormat(AudioFormat.Builder().setSampleRate(rate).setChannelMask(AudioFormat.CHANNEL_OUT_MONO).setEncoding(AudioFormat.ENCODING_PCM_16BIT).build())
+                      .setBufferSizeInBytes(size)
+                      .setTransferMode(AudioTrack.MODE_STREAM)
+                      .build()
+                  audioTrack = track
+                  running = true
+                  track.play()
+                  thread(name = "SpeakerTone") {
+                      val buffer = ShortArray(1024)
+                      var phase = 0.0
+                      val step = 2.0 * PI * frequency / rate
+                      while (running) {
+                          for (i in buffer.indices) {
+                              buffer[i] = (sin(phase) * 8000).toInt().toShort()
+                              phase += step
+                              if (phase >= 2.0 * PI) phase -= 2.0 * PI
+                          }
+                          if (running) {
+                              try {
+                                  track.write(buffer, 0, buffer.size)
+                              } catch (_: Exception) {
+                                  break
+                              }
+                          }
+                      }
+                  }
+              }
+
+              private fun stopAudio() {
+                  running = false
+                  val oldTrack = audioTrack
+                  audioTrack = null
+                  try {
+                      oldTrack?.pause()
+                      oldTrack?.flush()
+                      oldTrack?.stop()
+                  } catch (_: Exception) {}
+                  try {
+                      oldTrack?.release()
+                  } catch (_: Exception) {}
+              }
+
+              private fun vibratePhone(mode: String) {
+                  val vibrator: Vibrator? =
+                      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                          val manager = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
+                          manager.defaultVibrator
+                      } else {
+                          @Suppress("DEPRECATION")
+                          getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+                      }
+                  if (vibrator?.hasVibrator() != true) return
+                  val pattern = if (mode == "long") longArrayOf(0, 2500)
+                      else longArrayOf(0, 180, 120, 250, 120, 350)
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                      vibrator.vibrate(VibrationEffect.createWaveform(pattern, -1))
+                  } else {
+                      @Suppress("DEPRECATION")
+                      vibrator.vibrate(pattern, -1)
+                  }
+              }
+
+              override fun onDestroy() {
+                  stopAudio()
+                  super.onDestroy()
+              }
+          }
+          KOTLIN
+
+      - name: Build Release APK
+        working-directory: app
+        run: |
+          rm -f test/widget_test.dart
+          flutter pub get
+          # flutter analyze exits non-zero for lint infos/warnings in this generated project.
+          # Build the release APK directly; compiler errors will still fail the build.
+          flutter build apk --release
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: speaker-cleaner-pro-apk
+          path: app/build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+          retention-days: 7
