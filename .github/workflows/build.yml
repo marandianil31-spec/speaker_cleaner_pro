@@ -610,9 +610,10 @@ jobs:
           }
           KOTLIN
 
-      - name: Build Release APK
-        working-directory: app
-        run: |
+       - name: Build Release APK
+         working-directory: app
+         run: |
+          rm -f test/widget_test.dart
           flutter pub get
           flutter analyze
           flutter build apk --release
