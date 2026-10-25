@@ -1,3 +1,4 @@
+
 name: Build Speaker Cleaner Pro APK
 
 on:
@@ -20,6 +21,13 @@ jobs:
           channel: stable
           cache: true
 
+      - name: Check app entry point
+        run: |
+          echo "Checking lib/main.dart"
+          grep -n "SpeakerCleanerApp" lib/main.dart
+          test -f assets/audio/tone_165.wav
+          test -f assets/audio/sweep.wav
+
       - name: Generate Android project
         run: flutter create . --platforms=android --project-name=speaker_cleaner_pro
 
@@ -37,4 +45,5 @@ jobs:
         with:
           name: speaker-cleaner-pro-apk
           path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
           
