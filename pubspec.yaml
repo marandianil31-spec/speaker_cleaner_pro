@@ -1,19 +1,24 @@
 name: speaker_cleaner_pro
-description: Simple speaker tone and frequency sweep utility.
+description: Speaker Cleaner Pro - speaker tone and frequency sweep utility
 publish_to: 'none'
 version: 1.0.0+1
+
 environment:
   sdk: '>=3.10.0 <4.0.0'
+
 dependencies:
   flutter:
     sdk: flutter
   audioplayers: ^6.1.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
+
 flutter:
   uses-material-design: true
   assets:
     - assets/audio/tone_165.wav
     - assets/audio/sweep.wav
+    
