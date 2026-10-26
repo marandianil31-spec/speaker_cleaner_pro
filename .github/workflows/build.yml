@@ -21,18 +21,32 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Check app entry point
+      - name: Check app files
         run: |
-          echo "Checking lib/main.dart"
           grep -n "SpeakerCleanerApp" lib/main.dart
           test -f assets/audio/tone_165.wav
           test -f assets/audio/sweep.wav
+          test -f speaker_cleaner_icon.png
 
       - name: Generate Android project
         run: flutter create . --platforms=android --project-name=speaker_cleaner_pro
 
       - name: Get dependencies
         run: flutter pub get
+
+      - name: Set app icon
+        run: |
+          dart pub global activate flutter_launcher_icons
+          cat > flutter_launcher_icons.yaml <<'EOF'
+          flutter_launcher_icons:
+            android: true
+            ios: false
+            image_path: "speaker_cleaner_icon.png"
+            min_sdk_android: 21
+            adaptive_icon_background: "#081116"
+            adaptive_icon_foreground: "speaker_cleaner_icon.png"
+          EOF
+          dart pub global run flutter_launcher_icons
 
       - name: Analyze code
         run: flutter analyze
