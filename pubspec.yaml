@@ -9,8 +9,6 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  audioplayers: ^6.1.0
-  google_mobile_ads: ^7.0.0
 
 dev_dependencies:
   flutter_test:
