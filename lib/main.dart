@@ -53,7 +53,6 @@ class _CleanerHomePageState extends State<CleanerHomePage> {
 
   bool _bannerReady = false;
   bool _isPlaying = false;
-  bool _isDisposed = false;
 
   String _selectedMode = 'tone';
   String _status = 'Ready to clean your speaker';
