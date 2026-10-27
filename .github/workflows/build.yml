@@ -4,7 +4,8 @@ name: Build Speaker Cleaner Pro APK
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches:
+      - main
 
 permissions:
   contents: read
@@ -14,16 +15,18 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - uses: subosito/flutter-action@v2
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
 
       - name: Check app files
         run: |
-          grep -n "SpeakerCleanerApp" lib/main.dart
+          test -f lib/main.dart
           test -f assets/audio/tone_165.wav
           test -f assets/audio/sweep.wav
           test -f speaker_cleaner_icon.png
@@ -33,6 +36,32 @@ jobs:
 
       - name: Get dependencies
         run: flutter pub get
+
+      - name: Configure AdMob App ID
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("android/app/src/main/AndroidManifest.xml")
+          content = path.read_text()
+
+          app_id = (
+              '<meta-data '
+              'android:name="com.google.android.gms.ads.APPLICATION_ID" '
+              'android:value="ca-app-pub-6724668039220554~8020469476" />'
+          )
+
+          if "com.google.android.gms.ads.APPLICATION_ID" not in content:
+              if "</application>" not in content:
+                  raise SystemExit("Android application tag not found")
+              content = content.replace(
+                  "</application>",
+                  "        " + app_id + "\n    </application>"
+              )
+              path.write_text(content)
+
+          print("AdMob App ID configured")
+          PY
 
       - name: Set app icon
         run: |
