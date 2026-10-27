@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
@@ -18,73 +17,78 @@ class SpeakerCleanerApp extends StatelessWidget {
       title: 'Speaker Cleaner Pro',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        useMaterial3: true,
         brightness: Brightness.dark,
+        scaffoldBackgroundColor: const Color(0xFF081116),
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF36D6C5),
+          seedColor: const Color(0xFF00D6B2),
           brightness: Brightness.dark,
         ),
-        scaffoldBackgroundColor: const Color(0xFF081116),
+        useMaterial3: true,
       ),
-      home: const CleanerHome(),
+      home: const CleanerHomePage(),
     );
   }
 }
 
-class CleanerHome extends StatefulWidget {
-  const CleanerHome({super.key});
+class CleanerHomePage extends StatefulWidget {
+  const CleanerHomePage({super.key});
 
   @override
-  State<CleanerHome> createState() => _CleanerHomeState();
+  State<CleanerHomePage> createState() => _CleanerHomePageState();
 }
 
-class _CleanerHomeState extends State<CleanerHome> {
-  final AudioPlayer player = AudioPlayer();
+class _CleanerHomePageState extends State<CleanerHomePage> {
+  final AudioPlayer _player = AudioPlayer();
 
-  // Your AdMob Banner Ad Unit ID
-  static const String bannerAdUnitId =
-      'ca-app-pub-6724668039220554/2205955881';
+  // Official Google test ad-unit IDs.
+  // Replace these with your own ad-unit IDs after testing.
+  static const String _bannerAdUnitId =
+      'ca-app-pub-3940256099942544/6300978111';
 
-  // Your AdMob Interstitial Ad Unit ID
-  static const String interstitialAdUnitId =
-      'ca-app-pub-6724668039220554/8049309506';
+  static const String _interstitialAdUnitId =
+      'ca-app-pub-3940256099942544/1033173712';
 
   BannerAd? _bannerAd;
   InterstitialAd? _interstitialAd;
 
-  String status = 'Ready';
-  bool playing = false;
-  bool _isLoadingAd = false;
-  bool _showingInterstitial = false;
-  DateTime? _lastInterstitialTime;
+  bool _bannerReady = false;
+  bool _isPlaying = false;
+  bool _isDisposed = false;
+
+  String _selectedMode = 'tone';
+  String _status = 'Ready to clean your speaker';
+
+  DateTime? _lastInterstitialShown;
 
   @override
   void initState() {
     super.initState();
-
     _loadBannerAd();
     _loadInterstitialAd();
 
-    player.onPlayerComplete.listen((_) {
+    _player.onPlayerComplete.listen((_) {
       if (!mounted) return;
 
       setState(() {
-        playing = false;
-        status = 'Complete';
+        _isPlaying = false;
+        _status = 'Cleaning session completed';
       });
 
-      _showInterstitialWhenAppropriate();
+      _showInterstitialIfAllowed();
     });
 
-    player.onPlayerStateChanged.listen((state) {
+    _player.onPlayerStateChanged.listen((state) {
       if (!mounted) return;
-      setState(() => playing = state == PlayerState.playing);
+
+      setState(() {
+        _isPlaying = state == PlayerState.playing;
+      });
     });
   }
 
   void _loadBannerAd() {
-    final ad = BannerAd(
-      adUnitId: bannerAdUnitId,
+    _bannerAd = BannerAd(
+      adUnitId: _bannerAdUnitId,
       request: const AdRequest(),
       size: AdSize.banner,
       listener: BannerAdListener(
@@ -93,365 +97,348 @@ class _CleanerHomeState extends State<CleanerHome> {
             ad.dispose();
             return;
           }
-          setState(() => _bannerAd = ad as BannerAd);
+          setState(() {
+            _bannerReady = true;
+          });
         },
         onAdFailedToLoad: (ad, error) {
           ad.dispose();
-          debugPrint('Banner ad failed: $error');
+          if (!mounted) return;
+          setState(() {
+            _bannerReady = false;
+          });
         },
       ),
-    );
-
-    ad.load();
+    )..load();
   }
 
   void _loadInterstitialAd() {
     InterstitialAd.load(
-      adUnitId: interstitialAdUnitId,
+      adUnitId: _interstitialAdUnitId,
       request: const AdRequest(),
       adLoadCallback: InterstitialAdLoadCallback(
         onAdLoaded: (ad) {
+          if (!mounted) {
+            ad.dispose();
+            return;
+          }
           _interstitialAd = ad;
-          _isLoadingAd = false;
-
-          ad.fullScreenContentCallback = FullScreenContentCallback(
-            onAdDismissedFullScreenContent: (ad) {
-              ad.dispose();
-              _interstitialAd = null;
-              _showingInterstitial = false;
-              _loadInterstitialAd();
-            },
-            onAdFailedToShowFullScreenContent: (ad, error) {
-              debugPrint('Interstitial show failed: $error');
-              ad.dispose();
-              _interstitialAd = null;
-              _showingInterstitial = false;
-              _loadInterstitialAd();
-            },
-          );
         },
         onAdFailedToLoad: (error) {
-          debugPrint('Interstitial load failed: $error');
           _interstitialAd = null;
-          _isLoadingAd = false;
         },
       ),
     );
-
-    _isLoadingAd = true;
   }
 
-  void _showInterstitialWhenAppropriate() {
-    // Don't show an ad after every single playback.
+  void _showInterstitialIfAllowed() {
     final now = DateTime.now();
 
-    if (_showingInterstitial ||
-        playing ||
-        _interstitialAd == null ||
-        (_lastInterstitialTime != null &&
-            now.difference(_lastInterstitialTime!) <
-                const Duration(minutes: 3))) {
+    if (_lastInterstitialShown != null &&
+        now.difference(_lastInterstitialShown!) <
+            const Duration(minutes: 3)) {
       return;
     }
 
-    final ad = _interstitialAd!;
+    final ad = _interstitialAd;
+    if (ad == null) return;
+
     _interstitialAd = null;
-    _showingInterstitial = true;
-    _lastInterstitialTime = now;
+
+    ad.fullScreenContentCallback = FullScreenContentCallback(
+      onAdShowedFullScreenContent: (ad) {
+        _lastInterstitialShown = DateTime.now();
+      },
+      onAdDismissedFullScreenContent: (ad) {
+        ad.dispose();
+        _loadInterstitialAd();
+      },
+      onAdFailedToShowFullScreenContent: (ad, error) {
+        ad.dispose();
+        _loadInterstitialAd();
+      },
+    );
 
     ad.show();
   }
 
-  Future<void> play(String asset, String label) async {
+  Future<void> _startCleaning() async {
+    if (_isPlaying) return;
+
+    final asset = _selectedMode == 'tone'
+        ? 'audio/tone_165.wav'
+        : 'audio/sweep.wav';
+
     try {
-      await player.stop();
+      await _player.stop();
+      await _player.setReleaseMode(ReleaseMode.stop);
 
       if (!mounted) return;
-      setState(() => status = label);
-
-      await player.play(AssetSource(asset));
-    } catch (error) {
-      debugPrint('Audio playback error: $error');
-      if (mounted) {
-        setState(() => status = 'Playback error');
-      }
-    }
-  }
-
-  Future<void> stop() async {
-    await player.stop();
-
-    if (mounted) {
       setState(() {
-        playing = false;
-        status = 'Stopped';
+        _status = _selectedMode == 'tone'
+            ? 'Playing Speaker Tone...'
+            : 'Playing Frequency Sweep...';
+        _isPlaying = true;
+      });
+
+      await _player.play(AssetSource(asset));
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _isPlaying = false;
+        _status = 'Audio error. Please try again.';
       });
     }
   }
 
+  Future<void> _stopCleaning() async {
+    await _player.stop();
+
+    if (!mounted) return;
+    setState(() {
+      _isPlaying = false;
+      _status = 'Cleaning stopped';
+    });
+  }
+
   @override
   void dispose() {
+    _isDisposed = true;
     _bannerAd?.dispose();
     _interstitialAd?.dispose();
-    player.dispose();
+    _player.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Speaker Cleaner Pro',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.info_outline),
-            onPressed: () => showAboutDialog(
-              context: context,
-              applicationName: 'Speaker Cleaner Pro',
-              applicationVersion: '1.0.0',
-              children: const [
-                Text(
-                  'Plays short tones and a frequency sweep. '
-                  'Audio cannot guarantee water removal.',
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(20),
+        child: Column(
           children: [
-            Container(
-              padding: const EdgeInsets.all(22),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [
-                    Color(0xFF153E46),
-                    Color(0xFF14232B),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(26),
-                border: Border.all(color: const Color(0xFF2C676C)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(
-                    Icons.graphic_eq_rounded,
-                    size: 50,
-                    color: Color(0xFF36D6C5),
-                  ),
-                  const SizedBox(height: 14),
-                  const Text(
-                    'Clear sound. Simple controls.',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w800,
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(
+                          Icons.graphic_eq_rounded,
+                          size: 34,
+                          color: Color(0xFF00D6B2),
+                        ),
+                        SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Speaker Cleaner Pro',
+                            style: TextStyle(
+                              fontSize: 23,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Play a short tone or a gentle frequency sweep '
-                    'through your phone speaker.',
-                    style: TextStyle(
-                      color: Color(0xFFB9D0D4),
-                      height: 1.5,
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.circle,
-                        size: 10,
-                        color: Color(0xFF36D6C5),
+                    const SizedBox(height: 32),
+                    Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(26),
+                        gradient: const LinearGradient(
+                          colors: [
+                            Color(0xFF123B40),
+                            Color(0xFF10252D),
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        border: Border.all(
+                          color: const Color(0xFF00D6B2)
+                              .withValues(alpha: 0.25),
+                        ),
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          playing ? 'Playing: $status' : status,
+                      child: Column(
+                        children: [
+                          Icon(
+                            _isPlaying
+                                ? Icons.graphic_eq_rounded
+                                : Icons.speaker_rounded,
+                            size: 86,
+                            color: const Color(0xFF00D6B2),
+                          ),
+                          const SizedBox(height: 14),
+                          Text(
+                            _isPlaying
+                                ? 'Cleaning in Progress'
+                                : 'Clean Your Speaker',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontSize: 23,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            _status,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 28),
+                    const Text(
+                      'Choose Cleaning Mode',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    _modeCard(
+                      title: 'Speaker Tone',
+                      subtitle: '165 Hz • 8 seconds',
+                      icon: Icons.waves_rounded,
+                      mode: 'tone',
+                    ),
+                    const SizedBox(height: 12),
+                    _modeCard(
+                      title: 'Frequency Sweep',
+                      subtitle: '120–600 Hz • 12 seconds',
+                      icon: Icons.multitrack_audio_rounded,
+                      mode: 'sweep',
+                    ),
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      height: 56,
+                      child: ElevatedButton.icon(
+                        onPressed:
+                            _isPlaying ? _stopCleaning : _startCleaning,
+                        icon: Icon(
+                          _isPlaying
+                              ? Icons.stop_rounded
+                              : Icons.play_arrow_rounded,
+                          size: 28,
+                        ),
+                        label: Text(
+                          _isPlaying ? 'STOP CLEANING' : 'START CLEANING',
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
+                            letterSpacing: 0.7,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF00D6B2),
+                          foregroundColor: const Color(0xFF081116),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
                           ),
                         ),
                       ),
-                      if (playing)
-                        TextButton.icon(
-                          onPressed: stop,
-                          icon: const Icon(Icons.stop),
-                          label: const Text('Stop'),
-                        ),
-                    ],
-                  ),
-                ],
+                    ),
+                    const SizedBox(height: 20),
+                    const Text(
+                      'Tip: Keep your phone speaker facing downward. '
+                      'Use moderate volume and keep the phone away '
+                      'from your ears.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.white60,
+                        fontSize: 12,
+                        height: 1.5,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-            const SizedBox(height: 24),
-            const Text(
-              'CLEANING MODES',
-              style: TextStyle(
-                letterSpacing: 1.8,
-                color: Color(0xFF91AEB5),
-                fontWeight: FontWeight.bold,
+            if (_bannerReady && _bannerAd != null)
+              Container(
+                alignment: Alignment.center,
+                width: double.infinity,
+                height: _bannerAd!.size.height.toDouble(),
+                child: AdWidget(ad: _bannerAd!),
               ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _modeCard({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required String mode,
+  }) {
+    final selected = _selectedMode == mode;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(18),
+      onTap: _isPlaying
+          ? null
+          : () {
+              setState(() {
+                _selectedMode = mode;
+                _status = 'Ready to clean your speaker';
+              });
+            },
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: selected
+              ? const Color(0xFF123B40)
+              : const Color(0xFF111E25),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: selected
+                ? const Color(0xFF00D6B2)
+                : Colors.white12,
+            width: selected ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              size: 30,
+              color: const Color(0xFF00D6B2),
             ),
-            const SizedBox(height: 12),
-            _modeCard(
-              Icons.waves,
-              'Speaker Tone',
-              '165 Hz · 8 seconds',
-              'A short steady tone at moderate level.',
-              'Play Tone',
-              () => play('audio/tone_165.wav', 'Speaker Tone'),
-            ),
-            const SizedBox(height: 12),
-            _modeCard(
-              Icons.multitrack_audio,
-              'Frequency Sweep',
-              '120–600 Hz · 12 seconds',
-              'A gradual sweep across low frequencies.',
-              'Start Sweep',
-              () => play('audio/sweep.wav', 'Frequency Sweep'),
-            ),
-            const SizedBox(height: 22),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFF211F18),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: const Color(0xFF65552D)),
-              ),
-              child: const Row(
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(
-                    Icons.health_and_safety_outlined,
-                    color: Color(0xFFFFD27A),
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Safety: keep volume moderate, do not wear '
-                      'headphones during playback, and stop if '
-                      'uncomfortable. Follow your phone manufacturer’s '
-                      'guidance if the phone got wet. Audio cannot '
-                      'guarantee water removal.',
-                      style: TextStyle(
-                        height: 1.45,
-                        color: Color(0xFFE9DDBF),
-                      ),
+                  const SizedBox(height: 5),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      color: Colors.white60,
+                      fontSize: 13,
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 18),
-            const Text(
-              'No water-removal guarantee',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Color(0xFF71878D),
-                fontSize: 12,
-              ),
-            ),
-          ],
-        ),
-      ),
-
-      // Banner remains at the bottom while the app screen is open.
-      bottomNavigationBar: _bannerAd == null
-          ? const SizedBox(height: 8)
-          : SafeArea(
-              top: false,
-              child: SizedBox(
-                width: _bannerAd!.size.width.toDouble(),
-                height: _bannerAd!.size.height.toDouble(),
-                child: AdWidget(ad: _bannerAd!),
-              ),
-            ),
-    );
-  }
-
-  Widget _modeCard(
-    IconData icon,
-    String title,
-    String subtitle,
-    String detail,
-    String button,
-    VoidCallback onTap,
-  ) {
-    return Card(
-      color: const Color(0xFF14232B),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(22),
-        side: const BorderSide(color: Color(0xFF263940)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF203B42),
-                    borderRadius: BorderRadius.circular(15),
-                  ),
-                  child: Icon(
-                    icon,
-                    color: const Color(0xFF36D6C5),
-                    size: 28,
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        subtitle,
-                        style: const TextStyle(
-                          color: Color(0xFF8FE8DD),
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            Text(
-              detail,
-              style: const TextStyle(
-                color: Color(0xFFB2C4C9),
-                height: 1.4,
-              ),
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: onTap,
-                icon: const Icon(Icons.play_arrow_rounded),
-                label: Text(button),
-              ),
+            Icon(
+              selected
+                  ? Icons.radio_button_checked
+                  : Icons.radio_button_off,
+              color: selected
+                  ? const Color(0xFF00D6B2)
+                  : Colors.white38,
             ),
           ],
         ),
@@ -459,3 +446,4 @@ class _CleanerHomeState extends State<CleanerHome> {
     );
   }
 }
+
