@@ -1,18 +1,9 @@
 
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
-import 'package:google_mobile_ads/google_mobile_ads.dart';
 
-Future<void> main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // Ad initialization failure should not prevent Flutter startup.
-  try {
-    await MobileAds.instance.initialize();
-  } catch (e) {
-    debugPrint('Ad initialization failed: $e');
-  }
-
   runApp(const SpeakerCleanerApp());
 }
 
@@ -48,24 +39,9 @@ class CleanerHomePage extends StatefulWidget {
 class _CleanerHomePageState extends State<CleanerHomePage> {
   final AudioPlayer _player = AudioPlayer();
 
-  // Official Google test ad-unit IDs.
-  static const String _bannerAdUnitId =
-      'ca-app-pub-3940256099942544/6300978111';
-
-  static const String _interstitialAdUnitId =
-      'ca-app-pub-3940256099942544/1033173712';
-
-  BannerAd? _bannerAd;
-  InterstitialAd? _interstitialAd;
-
-  bool _bannerReady = false;
-  bool _isPlaying = false;
-  bool _adsInitialized = false;
-
   String _selectedMode = 'tone';
   String _status = 'Ready to clean your speaker';
-
-  DateTime? _lastInterstitialShown;
+  bool _isPlaying = false;
 
   @override
   void initState() {
@@ -78,8 +54,6 @@ class _CleanerHomePageState extends State<CleanerHomePage> {
         _isPlaying = false;
         _status = 'Cleaning session completed';
       });
-
-      _showInterstitialIfAllowed();
     });
 
     _player.onPlayerStateChanged.listen((state) {
@@ -89,117 +63,12 @@ class _CleanerHomePageState extends State<CleanerHomePage> {
         _isPlaying = state == PlayerState.playing;
       });
     });
-
-    _initializeAds();
-  }
-
-  Future<void> _initializeAds() async {
-    try {
-      await MobileAds.instance.initialize();
-
-      if (!mounted) return;
-      _adsInitialized = true;
-
-      _loadBannerAd();
-      _loadInterstitialAd();
-    } catch (e) {
-      debugPrint('Ads unavailable: $e');
-    }
-  }
-
-  void _loadBannerAd() {
-    if (!_adsInitialized) return;
-
-    final ad = BannerAd(
-      adUnitId: _bannerAdUnitId,
-      request: const AdRequest(),
-      size: AdSize.banner,
-      listener: BannerAdListener(
-        onAdLoaded: (ad) {
-          if (!mounted) {
-            ad.dispose();
-            return;
-          }
-
-          setState(() {
-            _bannerReady = true;
-          });
-        },
-        onAdFailedToLoad: (ad, error) {
-          ad.dispose();
-
-          if (!mounted) return;
-          setState(() {
-            _bannerReady = false;
-          });
-
-          debugPrint('Banner ad failed: $error');
-        },
-      ),
-    );
-
-    _bannerAd = ad;
-    ad.load();
-  }
-
-  void _loadInterstitialAd() {
-    if (!_adsInitialized) return;
-
-    InterstitialAd.load(
-      adUnitId: _interstitialAdUnitId,
-      request: const AdRequest(),
-      adLoadCallback: InterstitialAdLoadCallback(
-        onAdLoaded: (ad) {
-          if (!mounted) {
-            ad.dispose();
-            return;
-          }
-          _interstitialAd = ad;
-        },
-        onAdFailedToLoad: (error) {
-          _interstitialAd = null;
-          debugPrint('Interstitial ad failed: $error');
-        },
-      ),
-    );
-  }
-
-  void _showInterstitialIfAllowed() {
-    final now = DateTime.now();
-
-    if (_lastInterstitialShown != null &&
-        now.difference(_lastInterstitialShown!) <
-            const Duration(minutes: 3)) {
-      return;
-    }
-
-    final ad = _interstitialAd;
-    if (ad == null) return;
-
-    _interstitialAd = null;
-
-    ad.fullScreenContentCallback = FullScreenContentCallback(
-      onAdShowedFullScreenContent: (ad) {
-        _lastInterstitialShown = DateTime.now();
-      },
-      onAdDismissedFullScreenContent: (ad) {
-        ad.dispose();
-        _loadInterstitialAd();
-      },
-      onAdFailedToShowFullScreenContent: (ad, error) {
-        debugPrint('Interstitial display failed: $error');
-        ad.dispose();
-        _loadInterstitialAd();
-      },
-    );
-
-    ad.show();
   }
 
   Future<void> _startCleaning() async {
     if (_isPlaying) return;
 
-    final asset = _selectedMode == 'tone'
+    final String asset = _selectedMode == 'tone'
         ? 'audio/tone_165.wav'
         : 'audio/sweep.wav';
 
@@ -210,21 +79,21 @@ class _CleanerHomePageState extends State<CleanerHomePage> {
       if (!mounted) return;
 
       setState(() {
+        _isPlaying = true;
         _status = _selectedMode == 'tone'
             ? 'Playing Speaker Tone...'
             : 'Playing Frequency Sweep...';
-        _isPlaying = true;
       });
 
       await _player.play(AssetSource(asset));
-    } catch (e) {
-      debugPrint('Audio playback failed: $e');
+    } catch (error) {
+      debugPrint('Audio playback error: $error');
 
       if (!mounted) return;
 
       setState(() {
         _isPlaying = false;
-        _status = 'Audio error. Please try again.';
+        _status = 'Audio error. Check audio files.';
       });
     }
   }
@@ -232,8 +101,8 @@ class _CleanerHomePageState extends State<CleanerHomePage> {
   Future<void> _stopCleaning() async {
     try {
       await _player.stop();
-    } catch (e) {
-      debugPrint('Audio stop failed: $e');
+    } catch (error) {
+      debugPrint('Stop error: $error');
     }
 
     if (!mounted) return;
@@ -246,8 +115,6 @@ class _CleanerHomePageState extends State<CleanerHomePage> {
 
   @override
   void dispose() {
-    _bannerAd?.dispose();
-    _interstitialAd?.dispose();
     _player.dispose();
     super.dispose();
   }
@@ -385,9 +252,9 @@ class _CleanerHomePageState extends State<CleanerHomePage> {
                     ),
                     const SizedBox(height: 20),
                     const Text(
-                      'Tip: Keep your phone speaker facing downward. '
                       'Use moderate volume and keep the phone away '
-                      'from your ears.',
+                      'from your ears. Cleaning tones cannot guarantee '
+                      'removal of water or dust.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: Colors.white60,
@@ -399,12 +266,6 @@ class _CleanerHomePageState extends State<CleanerHomePage> {
                 ),
               ),
             ),
-            if (_bannerReady && _bannerAd != null)
-              SizedBox(
-                width: double.infinity,
-                height: _bannerAd!.size.height.toDouble(),
-                child: AdWidget(ad: _bannerAd!),
-              ),
           ],
         ),
       ),
@@ -417,7 +278,7 @@ class _CleanerHomePageState extends State<CleanerHomePage> {
     required IconData icon,
     required String mode,
   }) {
-    final selected = _selectedMode == mode;
+    final bool selected = _selectedMode == mode;
 
     return InkWell(
       borderRadius: BorderRadius.circular(18),
