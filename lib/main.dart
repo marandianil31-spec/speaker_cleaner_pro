@@ -202,7 +202,6 @@ class _CleanerHomePageState extends State<CleanerHomePage> {
 
   @override
   void dispose() {
-    _isDisposed = true;
     _bannerAd?.dispose();
     _interstitialAd?.dispose();
     _player.dispose();
