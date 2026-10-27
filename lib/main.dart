@@ -1,10 +1,18 @@
+
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await MobileAds.instance.initialize();
+
+  // Ad initialization failure should not prevent Flutter startup.
+  try {
+    await MobileAds.instance.initialize();
+  } catch (e) {
+    debugPrint('Ad initialization failed: $e');
+  }
+
   runApp(const SpeakerCleanerApp());
 }
 
@@ -41,7 +49,6 @@ class _CleanerHomePageState extends State<CleanerHomePage> {
   final AudioPlayer _player = AudioPlayer();
 
   // Official Google test ad-unit IDs.
-  // Replace these with your own ad-unit IDs after testing.
   static const String _bannerAdUnitId =
       'ca-app-pub-3940256099942544/6300978111';
 
@@ -53,6 +60,7 @@ class _CleanerHomePageState extends State<CleanerHomePage> {
 
   bool _bannerReady = false;
   bool _isPlaying = false;
+  bool _adsInitialized = false;
 
   String _selectedMode = 'tone';
   String _status = 'Ready to clean your speaker';
@@ -62,8 +70,6 @@ class _CleanerHomePageState extends State<CleanerHomePage> {
   @override
   void initState() {
     super.initState();
-    _loadBannerAd();
-    _loadInterstitialAd();
 
     _player.onPlayerComplete.listen((_) {
       if (!mounted) return;
@@ -83,10 +89,28 @@ class _CleanerHomePageState extends State<CleanerHomePage> {
         _isPlaying = state == PlayerState.playing;
       });
     });
+
+    _initializeAds();
+  }
+
+  Future<void> _initializeAds() async {
+    try {
+      await MobileAds.instance.initialize();
+
+      if (!mounted) return;
+      _adsInitialized = true;
+
+      _loadBannerAd();
+      _loadInterstitialAd();
+    } catch (e) {
+      debugPrint('Ads unavailable: $e');
+    }
   }
 
   void _loadBannerAd() {
-    _bannerAd = BannerAd(
+    if (!_adsInitialized) return;
+
+    final ad = BannerAd(
       adUnitId: _bannerAdUnitId,
       request: const AdRequest(),
       size: AdSize.banner,
@@ -96,22 +120,31 @@ class _CleanerHomePageState extends State<CleanerHomePage> {
             ad.dispose();
             return;
           }
+
           setState(() {
             _bannerReady = true;
           });
         },
         onAdFailedToLoad: (ad, error) {
           ad.dispose();
+
           if (!mounted) return;
           setState(() {
             _bannerReady = false;
           });
+
+          debugPrint('Banner ad failed: $error');
         },
       ),
-    )..load();
+    );
+
+    _bannerAd = ad;
+    ad.load();
   }
 
   void _loadInterstitialAd() {
+    if (!_adsInitialized) return;
+
     InterstitialAd.load(
       adUnitId: _interstitialAdUnitId,
       request: const AdRequest(),
@@ -125,6 +158,7 @@ class _CleanerHomePageState extends State<CleanerHomePage> {
         },
         onAdFailedToLoad: (error) {
           _interstitialAd = null;
+          debugPrint('Interstitial ad failed: $error');
         },
       ),
     );
@@ -153,6 +187,7 @@ class _CleanerHomePageState extends State<CleanerHomePage> {
         _loadInterstitialAd();
       },
       onAdFailedToShowFullScreenContent: (ad, error) {
+        debugPrint('Interstitial display failed: $error');
         ad.dispose();
         _loadInterstitialAd();
       },
@@ -173,6 +208,7 @@ class _CleanerHomePageState extends State<CleanerHomePage> {
       await _player.setReleaseMode(ReleaseMode.stop);
 
       if (!mounted) return;
+
       setState(() {
         _status = _selectedMode == 'tone'
             ? 'Playing Speaker Tone...'
@@ -181,8 +217,11 @@ class _CleanerHomePageState extends State<CleanerHomePage> {
       });
 
       await _player.play(AssetSource(asset));
-    } catch (error) {
+    } catch (e) {
+      debugPrint('Audio playback failed: $e');
+
       if (!mounted) return;
+
       setState(() {
         _isPlaying = false;
         _status = 'Audio error. Please try again.';
@@ -191,9 +230,14 @@ class _CleanerHomePageState extends State<CleanerHomePage> {
   }
 
   Future<void> _stopCleaning() async {
-    await _player.stop();
+    try {
+      await _player.stop();
+    } catch (e) {
+      debugPrint('Audio stop failed: $e');
+    }
 
     if (!mounted) return;
+
     setState(() {
       _isPlaying = false;
       _status = 'Cleaning stopped';
@@ -356,8 +400,7 @@ class _CleanerHomePageState extends State<CleanerHomePage> {
               ),
             ),
             if (_bannerReady && _bannerAd != null)
-              Container(
-                alignment: Alignment.center,
+              SizedBox(
                 width: double.infinity,
                 height: _bannerAd!.size.height.toDouble(),
                 child: AdWidget(ad: _bannerAd!),
@@ -444,4 +487,3 @@ class _CleanerHomePageState extends State<CleanerHomePage> {
     );
   }
 }
-
