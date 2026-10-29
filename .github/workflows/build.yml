@@ -1,3 +1,4 @@
+
 name: Build Speaker Cleaner Pro APK
 
 on:
@@ -11,6 +12,7 @@ permissions:
 
 jobs:
   build:
+    name: Build Android APK
     runs-on: ubuntu-latest
 
     steps:
@@ -23,14 +25,14 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Check app files
+      - name: Check required project files
         run: |
+          test -f pubspec.yaml
           test -f lib/main.dart
-          test -f assets/audio/tone_165.wav
           test -f assets/audio/sweep.wav
           test -f speaker_cleaner_icon.png
 
-      - name: Generate Frequency and Bass Audio
+      - name: Generate Frequency Audio Files
         run: |
           python3 - <<'PY'
           import math
@@ -43,7 +45,7 @@ jobs:
 
           sample_rate = 44100
           duration = 3
-          frequencies = [60,80,100,165,250,500,1000,2000,4000]
+          frequencies = [60, 80, 100, 165, 250, 500, 1000, 2000, 4000]
 
           for freq in frequencies:
               path = folder / f"tone_{freq}.wav"
@@ -56,25 +58,25 @@ jobs:
                   total = sample_rate * duration
 
                   for i in range(total):
-                      fade = min(1.0, i/500, (total-i)/500)
+                      fade = min(1.0, i / 500, (total - i) / 500)
                       value = int(
                           5000 * fade *
-                          math.sin(2*math.pi*freq*i/sample_rate)
+                          math.sin(2 * math.pi * freq * i / sample_rate)
                       )
                       frames.extend(struct.pack("<h", value))
 
                   wav.writeframes(frames)
 
-          print("Frequency audio generated.")
+          print("Frequency audio files generated successfully.")
           PY
 
       - name: Generate Android project
         run: flutter create . --platforms=android --project-name=speaker_cleaner_pro
 
-      - name: Get dependencies
+      - name: Get Flutter dependencies
         run: flutter pub get
 
-      - name: Configure AdMob App ID
+      - name: Configure AdMob Test App ID and Internet Permission
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -82,23 +84,45 @@ jobs:
           path = Path("android/app/src/main/AndroidManifest.xml")
           content = path.read_text()
 
-          app_id = '<meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="ca-app-pub-6724668039220554~8020469476"/>'
+          app_id = "ca-app-pub-3940256099942544~3347511713"
 
-          if "com.google.android.gms.ads.APPLICATION_ID" not in content:
+          permission = '<uses-permission android:name="android.permission.INTERNET"/>'
+          if "android.permission.INTERNET" not in content:
+              content = content.replace(
+                  "<application",
+                  permission + "\n    <application",
+                  1
+              )
+
+          meta = (
+              '<meta-data '
+              'android:name="com.google.android.gms.ads.APPLICATION_ID" '
+              f'android:value="{app_id}"/>'
+          )
+
+          if "com.google.android.gms.ads.APPLICATION_ID" in content:
+              import re
+              content = re.sub(
+                  r'<meta-data\s+android:name="com\.google\.android\.gms\.ads\.APPLICATION_ID"[^>]*/>',
+                  meta,
+                  content
+              )
+          else:
               content = content.replace(
                   "</application>",
-                  "        " + app_id + "\n    </application>"
+                  "        " + meta + "\n    </application>",
+                  1
               )
-              path.write_text(content)
 
-          print("AdMob configured.")
+          path.write_text(content)
+          print("AdMob test App ID and Internet permission configured.")
           PY
 
-      - name: Set app icon
+      - name: Set Android App Icon
         run: |
           dart pub global activate flutter_launcher_icons
 
-          cat > flutter_launcher_icons.yaml <<EOF
+          cat > flutter_launcher_icons.yaml <<'EOF'
           flutter_launcher_icons:
             android: true
             ios: false
@@ -109,15 +133,16 @@ jobs:
 
           dart pub global run flutter_launcher_icons
 
-      - name: Analyze code
+      - name: Analyze Flutter code
         run: flutter analyze
 
-      - name: Build APK
+      - name: Build Release APK
         run: flutter build apk --release
 
-      - name: Upload APK
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: speaker-cleaner-pro-apk
           path: build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
+          
