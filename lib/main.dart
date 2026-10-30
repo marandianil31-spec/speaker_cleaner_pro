@@ -1,10 +1,9 @@
+
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
-import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await MobileAds.instance.initialize();
   runApp(const SpeakerCleanerApp());
 }
 
@@ -12,12 +11,6 @@ const bg = Color(0xFF081116);
 const panel = Color(0xFF122128);
 const teal = Color(0xFF00D6B2);
 const muted = Color(0xFF91A5AB);
-
-// Google's official test ad unit IDs.
-const String bannerAdUnitId =
-    'ca-app-pub-3940256099942544/6300978111';
-const String interstitialAdUnitId =
-    'ca-app-pub-3940256099942544/1033173712';
 
 class SpeakerCleanerApp extends StatelessWidget {
   const SpeakerCleanerApp({super.key});
@@ -51,17 +44,12 @@ class CleanerHome extends StatefulWidget {
 class _CleanerHomeState extends State<CleanerHome> {
   final AudioPlayer _player = AudioPlayer();
 
-  BannerAd? _bannerAd;
-  InterstitialAd? _interstitialAd;
-
-  bool _bannerLoaded = false;
   bool _playing = false;
   bool _showFrequencies = false;
-  bool _interstitialShowing = false;
 
-  int _sessionsSinceAd = 0;
   String _status = 'Your speaker is ready';
   String _activeTool = '';
+
   double _volume = 0.25;
 
   final List<int> _frequencies = [
@@ -71,65 +59,16 @@ class _CleanerHomeState extends State<CleanerHome> {
   @override
   void initState() {
     super.initState();
-    _loadBanner();
-    _loadInterstitial();
 
     _player.onPlayerComplete.listen((_) {
       if (!mounted) return;
+
       setState(() {
         _playing = false;
         _activeTool = '';
         _status = 'Test completed';
       });
     });
-  }
-
-  void _loadBanner() {
-    final ad = BannerAd(
-      adUnitId: bannerAdUnitId,
-      request: const AdRequest(),
-      size: AdSize.banner,
-      listener: BannerAdListener(
-        onAdLoaded: (ad) {
-          if (!mounted) {
-            ad.dispose();
-            return;
-          }
-          setState(() {
-            _bannerAd = ad as BannerAd;
-            _bannerLoaded = true;
-          });
-        },
-        onAdFailedToLoad: (ad, error) {
-          ad.dispose();
-          if (!mounted) return;
-          setState(() {
-            _bannerAd = null;
-            _bannerLoaded = false;
-          });
-        },
-      ),
-    );
-    ad.load();
-  }
-
-  void _loadInterstitial() {
-    InterstitialAd.load(
-      adUnitId: interstitialAdUnitId,
-      request: const AdRequest(),
-      adLoadCallback: InterstitialAdLoadCallback(
-        onAdLoaded: (ad) {
-          if (!mounted) {
-            ad.dispose();
-            return;
-          }
-          _interstitialAd = ad;
-        },
-        onAdFailedToLoad: (error) {
-          _interstitialAd = null;
-        },
-      ),
-    );
   }
 
   Future<void> _play(String file, String tool) async {
@@ -140,14 +79,15 @@ class _CleanerHomeState extends State<CleanerHome> {
       await _player.play(AssetSource('audio/$file'));
 
       if (!mounted) return;
+
       setState(() {
         _playing = true;
         _activeTool = tool;
         _status = '$tool is running';
-        _sessionsSinceAd++;
       });
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
+
       setState(() {
         _playing = false;
         _activeTool = '';
@@ -162,47 +102,19 @@ class _CleanerHomeState extends State<CleanerHome> {
     } catch (_) {}
 
     if (!mounted) return;
+
     setState(() {
       _playing = false;
       _activeTool = '';
       _status = 'Cleaning stopped';
     });
-
-    if (_sessionsSinceAd >= 3) {
-      _sessionsSinceAd = 0;
-      _showInterstitial();
-    }
-  }
-
-  void _showInterstitial() {
-    final ad = _interstitialAd;
-
-    if (ad == null || _interstitialShowing) {
-      _loadInterstitial();
-      return;
-    }
-
-    _interstitialAd = null;
-    _interstitialShowing = true;
-
-    ad.fullScreenContentCallback = FullScreenContentCallback(
-      onAdDismissedFullScreenContent: (ad) {
-        ad.dispose();
-        _interstitialShowing = false;
-        _loadInterstitial();
-      },
-      onAdFailedToShowFullScreenContent: (ad, error) {
-        ad.dispose();
-        _interstitialShowing = false;
-        _loadInterstitial();
-      },
-    );
-
-    ad.show();
   }
 
   Future<void> _setVolume(double value) async {
-    setState(() => _volume = value);
+    setState(() {
+      _volume = value;
+    });
+
     try {
       await _player.setVolume(value);
     } catch (_) {}
@@ -224,7 +136,10 @@ class _CleanerHomeState extends State<CleanerHome> {
           const SizedBox(height: 4),
           Text(
             caption,
-            style: const TextStyle(color: muted, fontSize: 12),
+            style: const TextStyle(
+              color: muted,
+              fontSize: 12,
+            ),
           ),
         ],
       ),
@@ -360,7 +275,9 @@ class _CleanerHomeState extends State<CleanerHome> {
                 ),
               ],
             ),
+
             const SizedBox(height: 28),
+
             Container(
               padding: const EdgeInsets.fromLTRB(20, 23, 20, 20),
               decoration: BoxDecoration(
@@ -462,28 +379,42 @@ class _CleanerHomeState extends State<CleanerHome> {
                 ],
               ),
             ),
-            _heading('Cleaning Tools', 'Choose a tool for your speaker'),
+
+            _heading(
+              'Cleaning Tools',
+              'Choose a tool for your speaker',
+            ),
+
             _toolCard(
               icon: Icons.water_drop_outlined,
               title: 'Water Eject',
               subtitle: 'Play a tone to help dislodge moisture',
               onTap: () => _play('sweep.wav', 'Water Eject'),
             ),
+
             const SizedBox(height: 10),
+
             _toolCard(
               icon: Icons.cleaning_services_outlined,
               title: 'Dust Removal',
               subtitle: 'Use a sound tone for speaker care',
               onTap: () => _play('tone_165.wav', 'Dust Removal'),
             ),
+
             const SizedBox(height: 10),
+
             _toolCard(
               icon: Icons.verified_outlined,
               title: 'Speaker Test',
               subtitle: 'Check sound output with a test tone',
               onTap: () => _play('sweep.wav', 'Speaker Test'),
             ),
-            _heading('Sound Settings', 'Adjust the test volume safely'),
+
+            _heading(
+              'Sound Settings',
+              'Adjust the test volume safely',
+            ),
+
             Container(
               padding: const EdgeInsets.all(17),
               decoration: BoxDecoration(
@@ -505,7 +436,9 @@ class _CleanerHomeState extends State<CleanerHome> {
                       const Expanded(
                         child: Text(
                           'Test Volume',
-                          style: TextStyle(fontWeight: FontWeight.w700),
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                       Text(
@@ -527,15 +460,20 @@ class _CleanerHomeState extends State<CleanerHome> {
                   ),
                   const Text(
                     'Begin at low volume. Increase gradually.',
-                    style: TextStyle(color: muted, fontSize: 11),
+                    style: TextStyle(
+                      color: muted,
+                      fontSize: 11,
+                    ),
                   ),
                 ],
               ),
             ),
+
             _heading(
               'Frequency Test',
               'For checking different sound ranges',
             ),
+
             OutlinedButton(
               style: OutlinedButton.styleFrom(
                 foregroundColor: teal,
@@ -571,6 +509,7 @@ class _CleanerHomeState extends State<CleanerHome> {
                 ],
               ),
             ),
+
             if (_showFrequencies) ...[
               const SizedBox(height: 14),
               Wrap(
@@ -579,9 +518,12 @@ class _CleanerHomeState extends State<CleanerHome> {
                 children: _frequencies.map((hz) {
                   final label =
                       hz >= 1000 ? '${hz ~/ 1000} kHz' : '$hz Hz';
+
                   return OutlinedButton(
-                    onPressed: () =>
-                        _play('tone_$hz.wav', '$label Frequency Test'),
+                    onPressed: () => _play(
+                      'tone_$hz.wav',
+                      '$label Frequency Test',
+                    ),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: teal,
                       side: BorderSide(
@@ -596,7 +538,9 @@ class _CleanerHomeState extends State<CleanerHome> {
                 }).toList(),
               ),
             ],
+
             const SizedBox(height: 20),
+
             const Center(
               child: Text(
                 'SPEAKER CLEANER PRO',
@@ -608,7 +552,9 @@ class _CleanerHomeState extends State<CleanerHome> {
                 ),
               ),
             ),
+
             const SizedBox(height: 8),
+
             const Text(
               'Sound tones may help with minor moisture, but cannot guarantee removal of water or dust. Avoid high volume and stop if the speaker sounds distorted.',
               textAlign: TextAlign.center,
@@ -621,26 +567,12 @@ class _CleanerHomeState extends State<CleanerHome> {
           ],
         ),
       ),
-      bottomNavigationBar: _bannerLoaded && _bannerAd != null
-          ? SafeArea(
-              child: SizedBox(
-                height: _bannerAd!.size.height.toDouble(),
-                width: _bannerAd!.size.width.toDouble(),
-                child: Center(
-                  child: AdWidget(ad: _bannerAd!),
-                ),
-              ),
-            )
-          : null,
     );
   }
 
   @override
   void dispose() {
-    _bannerAd?.dispose();
-    _interstitialAd?.dispose();
     _player.dispose();
     super.dispose();
   }
 }
-
