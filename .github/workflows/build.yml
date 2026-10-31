@@ -1,4 +1,3 @@
-
 name: Build Speaker Cleaner Pro APK
 
 on:
@@ -49,6 +48,7 @@ jobs:
 
           for freq in frequencies:
               path = folder / f"tone_{freq}.wav"
+
               with wave.open(str(path), "wb") as wav:
                   wav.setnchannels(1)
                   wav.setsampwidth(2)
@@ -75,48 +75,6 @@ jobs:
 
       - name: Get Flutter dependencies
         run: flutter pub get
-
-      - name: Configure AdMob Test App ID and Internet Permission
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-
-          path = Path("android/app/src/main/AndroidManifest.xml")
-          content = path.read_text()
-
-          app_id = "ca-app-pub-3940256099942544~3347511713"
-
-          permission = '<uses-permission android:name="android.permission.INTERNET"/>'
-          if "android.permission.INTERNET" not in content:
-              content = content.replace(
-                  "<application",
-                  permission + "\n    <application",
-                  1
-              )
-
-          meta = (
-              '<meta-data '
-              'android:name="com.google.android.gms.ads.APPLICATION_ID" '
-              f'android:value="{app_id}"/>'
-          )
-
-          if "com.google.android.gms.ads.APPLICATION_ID" in content:
-              import re
-              content = re.sub(
-                  r'<meta-data\s+android:name="com\.google\.android\.gms\.ads\.APPLICATION_ID"[^>]*/>',
-                  meta,
-                  content
-              )
-          else:
-              content = content.replace(
-                  "</application>",
-                  "        " + meta + "\n    </application>",
-                  1
-              )
-
-          path.write_text(content)
-          print("AdMob test App ID and Internet permission configured.")
-          PY
 
       - name: Set Android App Icon
         run: |
