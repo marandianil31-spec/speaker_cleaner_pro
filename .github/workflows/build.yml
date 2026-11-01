@@ -1,3 +1,4 @@
+
 name: Build Speaker Cleaner Pro APK
 
 on:
@@ -33,9 +34,34 @@ jobs:
       - name: Generate Android Project
         run: flutter create --platforms=android .
 
+      - name: Configure AdMob App ID
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("android/app/src/main/AndroidManifest.xml")
+          content = path.read_text()
+
+          meta = '''
+              <meta-data
+                  android:name="com.google.android.gms.ads.APPLICATION_ID"
+                  android:value="ca-app-pub-6724668039220554~8020469476"/>
+          '''
+
+          if "com.google.android.gms.ads.APPLICATION_ID" not in content:
+              content = content.replace(
+                  "</application>",
+                  meta + "\n    </application>"
+              )
+              path.write_text(content)
+
+          print("AdMob App ID configured.")
+          PY
+
       - name: Generate Frequency Audio Files
         run: |
           mkdir -p assets/audio
+
           python3 - <<'PY'
           import math
           import wave
@@ -51,35 +77,44 @@ jobs:
 
           for frequency in frequencies:
               filename = f"assets/audio/tone_{frequency}.wav"
+
               with wave.open(filename, "w") as wav:
                   wav.setnchannels(1)
                   wav.setsampwidth(2)
                   wav.setframerate(sample_rate)
+
                   frames = []
+
                   for i in range(sample_rate * duration):
                       value = amplitude * math.sin(
                           2 * math.pi * frequency * i / sample_rate
                       )
-                      frames.append(struct.pack("<h", int(value * 32767)))
+
+                      frames.append(
+                          struct.pack("<h", int(value * 32767))
+                      )
+
                   wav.writeframes(b"".join(frames))
 
               print(f"Created: {filename}")
           PY
 
-      - name: Check Audio Assets
+      - name: Check Required Files
         run: |
           test -f assets/audio/sweep.wav
           test -f assets/audio/tone_165.wav
+          test -f speaker_cleaner_icon.png
+
           for frequency in 60 80 100 165 250 500 1000 2000 4000
           do
             test -f "assets/audio/tone_${frequency}.wav"
           done
-          echo "All audio files found successfully."
+
+          echo "All required files found."
 
       - name: Flutter Pub Get
         run: flutter pub get
 
-      # Generate App Icon
       - name: Generate Android App Icon
         run: dart run flutter_launcher_icons
 
@@ -95,3 +130,4 @@ jobs:
           name: Speaker-Cleaner-Pro-APK
           path: build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
+          
