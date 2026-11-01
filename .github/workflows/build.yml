@@ -42,21 +42,38 @@ jobs:
           path = Path("android/app/src/main/AndroidManifest.xml")
           content = path.read_text()
 
-          meta = '''
+          app_id = "ca-app-pub-6724668039220554~8020469476"
+
+          meta = f'''
               <meta-data
                   android:name="com.google.android.gms.ads.APPLICATION_ID"
-                  android:value="ca-app-pub-6724668039220554~8020469476"/>
+                  android:value="{app_id}"/>
           '''
 
-          if "com.google.android.gms.ads.APPLICATION_ID" not in content:
+          if "com.google.android.gms.ads.APPLICATION_ID" in content:
+              import re
+              content = re.sub(
+                  r'<meta-data\s+android:name="com.google.android.gms.ads.APPLICATION_ID".*?/>',
+                  meta.strip(),
+                  content,
+                  flags=re.DOTALL
+              )
+          else:
               content = content.replace(
                   "</application>",
                   meta + "\n    </application>"
               )
-              path.write_text(content)
 
+          path.write_text(content)
           print("AdMob App ID configured.")
           PY
+
+      - name: Check Android MainActivity
+        run: |
+          echo "Checking Android files..."
+          find android/app/src/main -type f
+          echo "Checking MainActivity..."
+          find android/app/src/main -name "MainActivity.*"
 
       - name: Generate Frequency Audio Files
         run: |
@@ -89,7 +106,6 @@ jobs:
                       value = amplitude * math.sin(
                           2 * math.pi * frequency * i / sample_rate
                       )
-
                       frames.append(
                           struct.pack("<h", int(value * 32767))
                       )
