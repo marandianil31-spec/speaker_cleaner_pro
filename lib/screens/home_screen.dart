@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
@@ -16,8 +15,8 @@ class _HomeScreenState extends State<HomeScreen> {
   BannerAd? _bannerAd;
   bool _isBannerLoaded = false;
 
-  // Google official test banner ID (Android)
-  static const String _testBannerId =
+  // Google official test banner ID
+  static const String _bannerId =
       'ca-app-pub-3940256099942544/6300978111';
 
   @override
@@ -28,9 +27,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _loadBannerAd() {
     final ad = BannerAd(
-      adUnitId: _testBannerId,
+      adUnitId: _bannerId,
       size: AdSize.banner,
       request: const AdRequest(),
+
       listener: BannerAdListener(
         onAdLoaded: (ad) {
           if (!mounted) {
@@ -43,9 +43,17 @@ class _HomeScreenState extends State<HomeScreen> {
             _isBannerLoaded = true;
           });
         },
+
         onAdFailedToLoad: (ad, error) {
           debugPrint('Banner Ad Error: $error');
           ad.dispose();
+
+          if (mounted) {
+            setState(() {
+              _bannerAd = null;
+              _isBannerLoaded = false;
+            });
+          }
         },
       ),
     );
@@ -115,12 +123,12 @@ class _HomeScreenState extends State<HomeScreen> {
             onTap: () => Navigator.pushNamed(context, '/frequency'),
           ),
 
-          // Banner Advertisement
+          // Banner Ad
           if (_isBannerLoaded && _bannerAd != null)
             Padding(
               padding: const EdgeInsets.symmetric(
                 horizontal: 16,
-                vertical: 12,
+                vertical: 16,
               ),
               child: Center(
                 child: SizedBox(
@@ -135,3 +143,4 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 }
+
