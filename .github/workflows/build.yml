@@ -15,45 +15,34 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout Repository
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # 2. Setup Java
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      # 3. Setup Flutter
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
 
-      # 4. Generate Android Project
       - name: Generate Android Project
-        run: |
-          flutter create --platforms=android .
+        run: flutter create --platforms=android .
 
-      # 5. Generate Frequency Audio Files
       - name: Generate Frequency Audio Files
         run: |
           mkdir -p assets/audio
-
           python3 - <<'PY'
           import math
           import wave
           import struct
           import os
 
-          frequencies = [
-              60, 80, 100, 165, 250,
-              500, 1000, 2000, 4000
-          ]
-
+          frequencies = [60, 80, 100, 165, 250, 500, 1000, 2000, 4000]
           sample_rate = 44100
           duration = 5
           amplitude = 0.20
@@ -62,60 +51,47 @@ jobs:
 
           for frequency in frequencies:
               filename = f"assets/audio/tone_{frequency}.wav"
-
               with wave.open(filename, "w") as wav:
                   wav.setnchannels(1)
                   wav.setsampwidth(2)
                   wav.setframerate(sample_rate)
-
                   frames = []
-
                   for i in range(sample_rate * duration):
                       value = amplitude * math.sin(
                           2 * math.pi * frequency * i / sample_rate
                       )
-
-                      frames.append(
-                          struct.pack("<h", int(value * 32767))
-                      )
-
+                      frames.append(struct.pack("<h", int(value * 32767)))
                   wav.writeframes(b"".join(frames))
 
               print(f"Created: {filename}")
           PY
 
-      # 6. Check Audio Assets
       - name: Check Audio Assets
         run: |
-          echo "Checking audio files..."
-
           test -f assets/audio/sweep.wav
           test -f assets/audio/tone_165.wav
-
           for frequency in 60 80 100 165 250 500 1000 2000 4000
           do
             test -f "assets/audio/tone_${frequency}.wav"
           done
-
           echo "All audio files found successfully."
 
-      # 7. Install Dependencies
       - name: Flutter Pub Get
         run: flutter pub get
 
-      # 8. Analyze Flutter Code
+      # Generate App Icon
+      - name: Generate Android App Icon
+        run: dart run flutter_launcher_icons
+
       - name: Analyze Flutter Code
         run: flutter analyze
 
-      # 9. Build Release APK
       - name: Build Release APK
         run: flutter build apk --release
 
-      # 10. Upload APK
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: Speaker-Cleaner-Pro-APK
           path: build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
-          
