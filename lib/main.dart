@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
@@ -8,10 +9,16 @@ import 'screens/settings_screen.dart';
 import 'screens/frequency_screen.dart';
 import 'screens/about_screen.dart';
 
-Future<void> main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Start app even if AdMob initialization fails.
+  runApp(const SpeakerCleanerApp());
+
+  // Initialize AdMob after the app starts.
+  _initializeAds();
+}
+
+Future<void> _initializeAds() async {
   try {
     await MobileAds.instance.initialize();
     debugPrint('AdMob initialized successfully');
@@ -19,8 +26,6 @@ Future<void> main() async {
     debugPrint('AdMob initialization failed: $error');
     debugPrintStack(stackTrace: stackTrace);
   }
-
-  runApp(const SpeakerCleanerApp());
 }
 
 class SpeakerCleanerApp extends StatelessWidget {
@@ -118,4 +123,3 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 }
-
