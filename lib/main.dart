@@ -9,16 +9,9 @@ import 'screens/settings_screen.dart';
 import 'screens/frequency_screen.dart';
 import 'screens/about_screen.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  runApp(const SpeakerCleanerApp());
-
-  // Initialize AdMob after the app starts.
-  _initializeAds();
-}
-
-Future<void> _initializeAds() async {
   try {
     await MobileAds.instance.initialize();
     debugPrint('AdMob initialized successfully');
@@ -26,6 +19,8 @@ Future<void> _initializeAds() async {
     debugPrint('AdMob initialization failed: $error');
     debugPrintStack(stackTrace: stackTrace);
   }
+
+  runApp(const SpeakerCleanerApp());
 }
 
 class SpeakerCleanerApp extends StatelessWidget {
@@ -36,7 +31,6 @@ class SpeakerCleanerApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Speaker Cleaner Pro',
-
       theme: ThemeData(
         brightness: Brightness.dark,
         scaffoldBackgroundColor: const Color(0xFF081116),
@@ -46,9 +40,7 @@ class SpeakerCleanerApp extends StatelessWidget {
         ),
         useMaterial3: true,
       ),
-
       initialRoute: '/',
-
       routes: {
         '/': (context) => const MainScreen(),
         '/water': (context) =>
@@ -87,19 +79,16 @@ class _MainScreenState extends State<MainScreen> {
         index: selectedIndex,
         children: screens,
       ),
-
       bottomNavigationBar: NavigationBar(
         selectedIndex: selectedIndex,
         backgroundColor: const Color(0xFF122128),
         indicatorColor:
             const Color(0xFF00D6B2).withValues(alpha: 0.2),
-
         onDestinationSelected: (index) {
           setState(() {
             selectedIndex = index;
           });
         },
-
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.home_outlined),
