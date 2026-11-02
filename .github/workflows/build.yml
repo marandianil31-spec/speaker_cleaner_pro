@@ -38,26 +38,21 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
+          import re
 
           path = Path("android/app/src/main/AndroidManifest.xml")
           content = path.read_text()
 
           app_id = "ca-app-pub-6724668039220554~8020469476"
 
-          meta = f'''
-              <meta-data
-                  android:name="com.google.android.gms.ads.APPLICATION_ID"
-                  android:value="{app_id}"/>
-          '''
+          meta = f'''<meta-data
+              android:name="com.google.android.gms.ads.APPLICATION_ID"
+              android:value="{app_id}" />'''
 
-          if "com.google.android.gms.ads.APPLICATION_ID" in content:
-              import re
-              content = re.sub(
-                  r'<meta-data\s+android:name="com.google.android.gms.ads.APPLICATION_ID".*?/>',
-                  meta.strip(),
-                  content,
-                  flags=re.DOTALL
-              )
+          pattern = r'<meta-data\s+android:name="com.google.android.gms.ads.APPLICATION_ID".*?/>'
+
+          if re.search(pattern, content, re.DOTALL):
+              content = re.sub(pattern, meta, content, flags=re.DOTALL)
           else:
               content = content.replace(
                   "</application>",
@@ -67,13 +62,6 @@ jobs:
           path.write_text(content)
           print("AdMob App ID configured.")
           PY
-
-      - name: Check Android MainActivity
-        run: |
-          echo "Checking Android files..."
-          find android/app/src/main -type f
-          echo "Checking MainActivity..."
-          find android/app/src/main -name "MainActivity.*"
 
       - name: Generate Frequency Audio Files
         run: |
@@ -130,6 +118,25 @@ jobs:
 
       - name: Flutter Pub Get
         run: flutter pub get
+
+      - name: Check WorkManager Dependency
+        run: |
+          cd android
+          ./gradlew :app:dependencies \
+            --configuration releaseRuntimeClasspath \
+            > ../dependencies.txt
+          cd ..
+          echo "=== WorkManager dependencies ==="
+          grep -i -A 5 -B 5 "work-runtime" dependencies.txt || true
+          echo "=== Room dependencies ==="
+          grep -i -A 5 -B 5 "room-runtime" dependencies.txt || true
+
+      - name: Inspect Android MainActivity
+        run: |
+          echo "=== Android source files ==="
+          find android/app/src/main -type f
+          echo "=== MainActivity ==="
+          find android/app/src/main -name "MainActivity.*"
 
       - name: Generate Android App Icon
         run: dart run flutter_launcher_icons
