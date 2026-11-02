@@ -1,4 +1,3 @@
-
 name: Build Speaker Cleaner Pro APK
 
 on:
@@ -119,6 +118,43 @@ jobs:
       - name: Flutter Pub Get
         run: flutter pub get
 
+      - name: Inspect Generated Android Gradle Configuration
+        run: |
+          echo "========== ANDROID FILES =========="
+          find android -maxdepth 3 -type f | sort
+
+          echo "========== APP GRADLE =========="
+          if [ -f android/app/build.gradle.kts ]; then
+            cat android/app/build.gradle.kts
+          elif [ -f android/app/build.gradle ]; then
+            cat android/app/build.gradle
+          else
+            echo "App Gradle file not found."
+          fi
+
+          echo "========== ROOT GRADLE =========="
+          if [ -f android/build.gradle.kts ]; then
+            cat android/build.gradle.kts
+          elif [ -f android/build.gradle ]; then
+            cat android/build.gradle
+          else
+            echo "Root Gradle file not found."
+          fi
+
+          echo "========== GRADLE PROPERTIES =========="
+          cat android/gradle.properties || true
+
+          echo "========== WORKMANAGER DEPENDENCIES =========="
+          cd android
+          ./gradlew :app:dependencyInsight \
+            --configuration releaseRuntimeClasspath \
+            --dependency androidx.work:work-runtime || true
+
+          echo "========== ROOM DEPENDENCIES =========="
+          ./gradlew :app:dependencyInsight \
+            --configuration releaseRuntimeClasspath \
+            --dependency androidx.room:room-runtime || true
+
       - name: Check WorkManager Dependency
         run: |
           cd android
@@ -126,8 +162,10 @@ jobs:
             --configuration releaseRuntimeClasspath \
             > ../dependencies.txt
           cd ..
+
           echo "=== WorkManager dependencies ==="
           grep -i -A 5 -B 5 "work-runtime" dependencies.txt || true
+
           echo "=== Room dependencies ==="
           grep -i -A 5 -B 5 "room-runtime" dependencies.txt || true
 
@@ -135,6 +173,7 @@ jobs:
         run: |
           echo "=== Android source files ==="
           find android/app/src/main -type f
+
           echo "=== MainActivity ==="
           find android/app/src/main -name "MainActivity.*"
 
