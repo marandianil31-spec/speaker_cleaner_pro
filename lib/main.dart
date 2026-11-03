@@ -1,5 +1,5 @@
+
 import 'package:flutter/material.dart';
-import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 import 'screens/home_screen.dart';
 import 'screens/cleaning_screen.dart';
@@ -8,17 +8,8 @@ import 'screens/settings_screen.dart';
 import 'screens/frequency_screen.dart';
 import 'screens/about_screen.dart';
 
-Future<void> main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
-
-  try {
-    await MobileAds.instance.initialize();
-    debugPrint('AdMob initialized successfully');
-  } catch (error, stackTrace) {
-    debugPrint('AdMob initialization failed: $error');
-    debugPrintStack(stackTrace: stackTrace);
-  }
-
   runApp(const SpeakerCleanerApp());
 }
 
@@ -111,4 +102,3 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 }
-
