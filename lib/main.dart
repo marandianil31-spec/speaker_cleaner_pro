@@ -1,5 +1,5 @@
-
 import 'package:flutter/material.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 import 'screens/home_screen.dart';
 import 'screens/cleaning_screen.dart';
@@ -8,9 +8,25 @@ import 'screens/settings_screen.dart';
 import 'screens/frequency_screen.dart';
 import 'screens/about_screen.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
   runApp(const SpeakerCleanerApp());
+
+  // Initialize AdMob after the first frame.
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    _initializeAds();
+  });
+}
+
+Future<void> _initializeAds() async {
+  try {
+    await MobileAds.instance.initialize();
+    debugPrint('AdMob initialization completed');
+  } catch (error, stackTrace) {
+    debugPrint('AdMob initialization error: $error');
+    debugPrintStack(stackTrace: stackTrace);
+  }
 }
 
 class SpeakerCleanerApp extends StatelessWidget {
@@ -102,3 +118,4 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 }
+
