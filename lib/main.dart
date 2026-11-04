@@ -13,20 +13,15 @@ Future<void> main() async {
 
   runApp(const SpeakerCleanerApp());
 
-  // Initialize AdMob after the first frame.
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    _initializeAds();
+  WidgetsBinding.instance.addPostFrameCallback((_) async {
+    try {
+      await MobileAds.instance.initialize();
+      debugPrint('AdMob SDK initialized successfully');
+    } catch (e, stackTrace) {
+      debugPrint('AdMob initialization error: $e');
+      debugPrintStack(stackTrace: stackTrace);
+    }
   });
-}
-
-Future<void> _initializeAds() async {
-  try {
-    await MobileAds.instance.initialize();
-    debugPrint('AdMob initialization completed');
-  } catch (error, stackTrace) {
-    debugPrint('AdMob initialization error: $error');
-    debugPrintStack(stackTrace: stackTrace);
-  }
 }
 
 class SpeakerCleanerApp extends StatelessWidget {
