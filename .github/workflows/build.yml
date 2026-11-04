@@ -1,34 +1,159 @@
 
-name: speaker_cleaner_pro
-description: Speaker Cleaner Pro - Speaker cleaning utility
-publish_to: 'none'
-version: 1.0.0+1
+name: Build Speaker Cleaner Pro APK
 
-environment:
-  sdk: '>=3.10.0 <4.0.0'
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
 
-dependencies:
-  flutter:
-    sdk: flutter
-  audioplayers: ^6.1.0
-  google_mobile_ads: ^7.0.0
+permissions:
+  contents: read
 
-dev_dependencies:
-  flutter_test:
-    sdk: flutter
-  flutter_lints: ^5.0.0
-  flutter_launcher_icons: ^0.14.4
+jobs:
+  build:
+    name: Build Android APK
+    runs-on: ubuntu-latest
 
-flutter:
-  uses-material-design: true
-  assets:
-    - assets/audio/
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-flutter_launcher_icons:
-  android: true
-  ios: false
-  image_path: "speaker_cleaner_icon.png"
-  min_sdk_android: 21
-  adaptive_icon_background: "#081116"
-  adaptive_icon_foreground: "speaker_cleaner_icon.png"
-  
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Generate Android Project
+        run: flutter create --platforms=android .
+
+      - name: Check AdMob App ID
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          path = Path("android/app/src/main/AndroidManifest.xml")
+          content = path.read_text()
+
+          app_id = "ca-app-pub-6724668039220554~8020469476"
+
+          meta = f'''<meta-data
+              android:name="com.google.android.gms.ads.APPLICATION_ID"
+              android:value="{app_id}" />'''
+
+          pattern = r'<meta-data\s+android:name="com.google.android.gms.ads.APPLICATION_ID".*?/>'
+
+          if re.search(pattern, content, re.DOTALL):
+              content = re.sub(pattern, meta, content, flags=re.DOTALL)
+          else:
+              content = content.replace(
+                  "</application>",
+                  meta + "\n    </application>"
+              )
+
+          path.write_text(content)
+          print("AdMob App ID configured.")
+          PY
+
+      - name: Generate Frequency Audio Files
+        run: |
+          mkdir -p assets/audio
+
+          python3 - <<'PY'
+          import math
+          import wave
+          import struct
+          import os
+
+          frequencies = [60, 80, 100, 165, 250, 500, 1000, 2000, 4000]
+          sample_rate = 44100
+          duration = 5
+          amplitude = 0.20
+
+          os.makedirs("assets/audio", exist_ok=True)
+
+          for frequency in frequencies:
+              filename = f"assets/audio/tone_{frequency}.wav"
+
+              with wave.open(filename, "w") as wav:
+                  wav.setnchannels(1)
+                  wav.setsampwidth(2)
+                  wav.setframerate(sample_rate)
+
+                  frames = []
+
+                  for i in range(sample_rate * duration):
+                      value = amplitude * math.sin(
+                          2 * math.pi * frequency * i / sample_rate
+                      )
+                      frames.append(
+                          struct.pack("<h", int(value * 32767))
+                      )
+
+                  wav.writeframes(b"".join(frames))
+
+              print(f"Created: {filename}")
+          PY
+
+      - name: Check Required Files
+        run: |
+          test -f assets/audio/sweep.wav
+          test -f speaker_cleaner_icon.png
+
+          for frequency in 60 80 100 165 250 500 1000 2000 4000
+          do
+            test -f "assets/audio/tone_${frequency}.wav"
+          done
+
+          echo "All required files found."
+
+      - name: Flutter Pub Get
+        run: flutter pub get
+
+      - name: Inspect Android Gradle Configuration
+        run: |
+          echo "========== APP GRADLE =========="
+
+          if [ -f android/app/build.gradle.kts ]; then
+            cat android/app/build.gradle.kts
+          elif [ -f android/app/build.gradle ]; then
+            cat android/app/build.gradle
+          fi
+
+          echo "========== WORKMANAGER =========="
+          cd android
+
+          ./gradlew :app:dependencyInsight \
+            --configuration releaseRuntimeClasspath \
+            --dependency androidx.work:work-runtime || true
+
+          echo "========== ROOM =========="
+
+          ./gradlew :app:dependencyInsight \
+            --configuration releaseRuntimeClasspath \
+            --dependency androidx.room:room-runtime || true
+
+      - name: Generate Android App Icon
+        run: dart run flutter_launcher_icons
+
+      - name: Analyze Flutter Code
+        run: flutter analyze
+
+      - name: Build Release APK
+        run: flutter build apk --release
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Speaker-Cleaner-Pro-APK
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+          
