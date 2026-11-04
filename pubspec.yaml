@@ -1,5 +1,6 @@
+
 name: speaker_cleaner_pro
-description: Speaker Cleaner Pro - Speaker cleaning utility
+description: Speaker Cleaner Pro - Speaker cleaning and frequency test utility
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -9,8 +10,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+
   audioplayers: ^6.1.0
-  google_mobile_ads: ^7.0.0
 
 dev_dependencies:
   flutter_test:
@@ -20,6 +21,7 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
   assets:
     - assets/audio/
 
