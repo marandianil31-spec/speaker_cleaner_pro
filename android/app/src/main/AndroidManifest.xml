@@ -7,11 +7,7 @@
         android:label="Speaker Cleaner Pro"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
-
-        <meta-data
-            android:name="com.google.android.gms.ads.APPLICATION_ID"
-            android:value="ca-app-pub-6724668039220554~8020469476" />
-
+        
         <activity
             android:name=".MainActivity"
             android:exported="true"
