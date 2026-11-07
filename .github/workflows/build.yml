@@ -33,12 +33,95 @@ jobs:
       - name: Generate Android Project
         run: flutter create --platforms=android .
 
+      - name: Configure AdMob App ID
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          path = Path("android/app/src/main/AndroidManifest.xml")
+          content = path.read_text()
+
+          app_id = "ca-app-pub-6724668039220554~8020469476"
+
+          meta = f'''<meta-data
+              android:name="com.google.android.gms.ads.APPLICATION_ID"
+              android:value="{app_id}" />'''
+
+          pattern = r'<meta-data\s+android:name="com.google.android.gms.ads.APPLICATION_ID".*?/>'
+
+          if re.search(pattern, content, re.DOTALL):
+              content = re.sub(pattern, meta, content, flags=re.DOTALL)
+          else:
+              content = content.replace(
+                  "</application>",
+                  meta + "\n    </application>"
+              )
+
+          path.write_text(content)
+          print("AdMob App ID configured.")
+          PY
+
+      - name: Generate Frequency Audio Files
+        run: |
+          mkdir -p assets/audio
+
+          python3 - <<'PY'
+          import math
+          import wave
+          import struct
+
+          frequencies = [60, 80, 100, 165, 250, 500, 1000, 2000, 4000]
+          sample_rate = 44100
+          duration = 5
+          amplitude = 0.20
+
+          for frequency in frequencies:
+              filename = f"assets/audio/tone_{frequency}.wav"
+
+              with wave.open(filename, "w") as wav:
+                  wav.setnchannels(1)
+                  wav.setsampwidth(2)
+                  wav.setframerate(sample_rate)
+
+                  frames = []
+
+                  for i in range(sample_rate * duration):
+                      value = amplitude * math.sin(
+                          2 * math.pi * frequency * i / sample_rate
+                      )
+                      frames.append(
+                          struct.pack("<h", int(value * 32767))
+                      )
+
+                  wav.writeframes(b"".join(frames))
+
+              print(f"Created: {filename}")
+          PY
+
+      - name: Check Required Files
+        run: |
+          test -f assets/audio/sweep.wav
+          test -f speaker_cleaner_icon.png
+
+          for frequency in 60 80 100 165 250 500 1000 2000 4000
+          do
+            test -f "assets/audio/tone_${frequency}.wav"
+          done
+
+          echo "All required files found."
+
       - name: Flutter Pub Get
         run: flutter pub get
 
-      - name: Check Android SDK Versions
+      - name: Verify AdMob Dependency
         run: |
-          echo "========== ANDROID APP GRADLE =========="
+          grep -n "google_mobile_ads" pubspec.yaml
+          flutter pub deps | grep -i -A 3 google_mobile_ads
+
+      - name: Inspect Android SDK Configuration
+        run: |
+          echo "========== APP GRADLE =========="
 
           if [ -f android/app/build.gradle.kts ]; then
             cat android/app/build.gradle.kts
@@ -46,43 +129,38 @@ jobs:
             cat android/app/build.gradle
           fi
 
-          echo "========== ANDROID SDK VALUES =========="
+          echo "========== MANIFEST =========="
+          cat android/app/src/main/AndroidManifest.xml
 
-          grep -n -E "minSdk|compileSdk|targetSdk" \
-            android/app/build.gradle* || true
-
-          echo "========== FLUTTER VERSION =========="
-          flutter --version
-
-          echo "========== JAVA VERSION =========="
-          java -version
-
-      - name: Check AdMob Dependencies
+      - name: Find WorkManager Dependency Source
         run: |
-          echo "========== GOOGLE MOBILE ADS =========="
-
-          grep -n "google_mobile_ads" pubspec.yaml || true
+          cd android
 
           echo "========== WORKMANAGER =========="
 
-          cd android
-
           ./gradlew :app:dependencyInsight \
             --configuration releaseRuntimeClasspath \
-            --dependency androidx.work:work-runtime || true
+            --dependency androidx.work:work-runtime
 
           echo "========== ROOM =========="
 
           ./gradlew :app:dependencyInsight \
             --configuration releaseRuntimeClasspath \
-            --dependency androidx.room:room-runtime || true
+            --dependency androidx.room:room-runtime
 
-      - name: Check Required Files
+      - name: Inspect All Android Dependencies
         run: |
-          test -f assets/audio/sweep.wav
-          test -f speaker_cleaner_icon.png
+          cd android
 
-          echo "Required files found."
+          ./gradlew :app:dependencies \
+            --configuration releaseRuntimeClasspath \
+            > ../dependencies.txt
+
+          cd ..
+
+          grep -i -A 5 -B 5 \
+            -E "work-runtime|room-runtime|play-services-ads" \
+            dependencies.txt || true
 
       - name: Generate Android App Icon
         run: dart run flutter_launcher_icons
