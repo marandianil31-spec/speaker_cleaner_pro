@@ -1,3 +1,4 @@
+
 name: Build Speaker Cleaner Pro APK
 
 on:
@@ -33,7 +34,12 @@ jobs:
       - name: Generate Android Project
         run: flutter create --platforms=android .
 
-      # WorkManager automatic startup बंद करें
+      - name: Use Official Gradle Download URL
+        run: |
+          FILE="android/gradle/wrapper/gradle-wrapper.properties"
+          sed -i 's#https://github.com/gradle/gradle-distributions/releases/download/v#https://downloads.gradle.org/distributions/gradle-#' "$FILE"
+          cat "$FILE"
+
       - name: Disable WorkManager Auto Initializer
         run: |
           python3 - <<'PY'
@@ -48,8 +54,6 @@ jobs:
                   'xmlns:android="http://schemas.android.com/apk/res/android" '
                   'xmlns:tools="http://schemas.android.com/tools"'
               )
-
-          marker = '<meta-data android:name="androidx.work.WorkManagerInitializer" tools:node="remove" />'
 
           provider = '''<provider
               android:name="androidx.startup.InitializationProvider"
@@ -158,8 +162,7 @@ jobs:
           grep -n -A 5 "google_mobile_ads:" pubspec.lock
 
       - name: Verify Android Manifest
-        run: |
-          cat android/app/src/main/AndroidManifest.xml
+        run: cat android/app/src/main/AndroidManifest.xml
 
       - name: Generate Android App Icon
         run: dart run flutter_launcher_icons
@@ -176,3 +179,4 @@ jobs:
           name: Speaker-Cleaner-Pro-APK
           path: build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
+          
