@@ -1,4 +1,3 @@
-
 name: Build Speaker Cleaner Pro APK
 
 on:
@@ -33,6 +32,44 @@ jobs:
 
       - name: Generate Android Project
         run: flutter create --platforms=android .
+
+      # WorkManager automatic startup बंद करें
+      - name: Disable WorkManager Auto Initializer
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("android/app/src/main/AndroidManifest.xml")
+          content = path.read_text()
+
+          if 'xmlns:tools=' not in content:
+              content = content.replace(
+                  'xmlns:android="http://schemas.android.com/apk/res/android"',
+                  'xmlns:android="http://schemas.android.com/apk/res/android" '
+                  'xmlns:tools="http://schemas.android.com/tools"'
+              )
+
+          marker = '<meta-data android:name="androidx.work.WorkManagerInitializer" tools:node="remove" />'
+
+          provider = '''<provider
+              android:name="androidx.startup.InitializationProvider"
+              android:authorities="${applicationId}.androidx-startup"
+              android:exported="false"
+              tools:node="merge">
+              <meta-data
+                  android:name="androidx.work.WorkManagerInitializer"
+                  tools:node="remove" />
+          </provider>'''
+
+          if "androidx.work.WorkManagerInitializer" not in content:
+              content = content.replace(
+                  "</application>",
+                  provider + "\n    </application>"
+              )
+
+          path.write_text(content)
+          print("WorkManager automatic initializer disabled.")
+          PY
 
       - name: Configure AdMob App ID
         run: |
@@ -112,35 +149,17 @@ jobs:
 
           echo "All required files found."
 
-      - name: Upgrade AdMob Dependency
-        run: |
-          flutter pub upgrade google_mobile_ads
-          flutter pub deps | grep -i -A 5 google_mobile_ads
-
       - name: Flutter Pub Get
         run: flutter pub get
 
-      - name: Verify AdMob Version
+      - name: Verify AdMob Dependency
         run: |
+          flutter pub deps | grep -i -A 5 google_mobile_ads
           grep -n -A 5 "google_mobile_ads:" pubspec.lock
 
-      - name: Inspect Android Manifest
+      - name: Verify Android Manifest
         run: |
           cat android/app/src/main/AndroidManifest.xml
-
-      - name: Inspect Android Dependencies
-        run: |
-          cd android
-
-          ./gradlew :app:dependencies \
-            --configuration releaseRuntimeClasspath \
-            > ../dependencies.txt
-
-          cd ..
-
-          grep -i -A 5 -B 5 \
-            -E "work-runtime|room-runtime|play-services-ads" \
-            dependencies.txt || true
 
       - name: Generate Android App Icon
         run: dart run flutter_launcher_icons
@@ -157,4 +176,3 @@ jobs:
           name: Speaker-Cleaner-Pro-APK
           path: build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
-          
