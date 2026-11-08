@@ -1,6 +1,7 @@
-
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
+
 import '../services/audio_service.dart';
 
 enum CleaningMode {
@@ -33,6 +34,14 @@ class _CleaningScreenState extends State<CleaningScreen>
 
   static const int cleaningSeconds = 30;
 
+  // ADMOB BANNER
+  BannerAd? _bannerAd;
+  bool _isBannerAdLoaded = false;
+
+  // Official Google Test Banner ID
+  static const String _bannerAdUnitId =
+      'ca-app-pub-3940256099942544/6300978111';
+
   @override
   void initState() {
     super.initState();
@@ -57,6 +66,41 @@ class _CleaningScreenState extends State<CleaningScreen>
         finishCleaning();
       }
     });
+
+    // LOAD BANNER AD
+    _loadBannerAd();
+  }
+
+  // LOAD ADMOB BANNER
+
+  void _loadBannerAd() {
+    final banner = BannerAd(
+      adUnitId: _bannerAdUnitId,
+      size: AdSize.banner,
+      request: const AdRequest(),
+      listener: BannerAdListener(
+        onAdLoaded: (ad) {
+          if (!mounted) {
+            ad.dispose();
+            return;
+          }
+
+          setState(() {
+            _bannerAd = ad as BannerAd;
+            _isBannerAdLoaded = true;
+          });
+
+          debugPrint('Cleaning Banner Ad Loaded');
+        },
+        onAdFailedToLoad: (ad, error) {
+          ad.dispose();
+
+          debugPrint('Cleaning Banner Error: $error');
+        },
+      ),
+    );
+
+    banner.load();
   }
 
   // START CLEANING
@@ -148,6 +192,7 @@ class _CleaningScreenState extends State<CleaningScreen>
   @override
   void dispose() {
     controller.dispose();
+    _bannerAd?.dispose();
     AudioService.instance.stopAudio();
     super.dispose();
   }
@@ -395,6 +440,21 @@ class _CleaningScreenState extends State<CleaningScreen>
           ),
         ),
       ),
+
+      // BOTTOM BANNER AD
+
+      bottomNavigationBar:
+          _isBannerAdLoaded && _bannerAd != null
+              ? SafeArea(
+                  child: SizedBox(
+                    width: _bannerAd!.size.width.toDouble(),
+                    height: _bannerAd!.size.height.toDouble(),
+                    child: Center(
+                      child: AdWidget(ad: _bannerAd!),
+                    ),
+                  ),
+                )
+              : null,
     );
   }
 
@@ -600,3 +660,4 @@ class CleaningPainter extends CustomPainter {
         oldDelegate.isDone != isDone;
   }
 }
+
