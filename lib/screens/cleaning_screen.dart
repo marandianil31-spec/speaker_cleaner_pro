@@ -1,3 +1,4 @@
+
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
@@ -23,7 +24,6 @@ class CleaningScreen extends StatefulWidget {
 
 class _CleaningScreenState extends State<CleaningScreen>
     with SingleTickerProviderStateMixin {
-
   late CleaningMode mode;
   late AnimationController controller;
 
@@ -34,13 +34,12 @@ class _CleaningScreenState extends State<CleaningScreen>
 
   static const int cleaningSeconds = 30;
 
-  // ADMOB BANNER
   BannerAd? _bannerAd;
   bool _isBannerAdLoaded = false;
 
-  // Official Google Test Banner ID
+  // Real AdMob Top Banner ID
   static const String _bannerAdUnitId =
-      'ca-app-pub-3940256099942544/6300978111';
+      'ca-app-pub-6724668039220554/2205955881';
 
   @override
   void initState() {
@@ -67,11 +66,8 @@ class _CleaningScreenState extends State<CleaningScreen>
       }
     });
 
-    // LOAD BANNER AD
     _loadBannerAd();
   }
-
-  // LOAD ADMOB BANNER
 
   void _loadBannerAd() {
     final banner = BannerAd(
@@ -90,20 +86,20 @@ class _CleaningScreenState extends State<CleaningScreen>
             _isBannerAdLoaded = true;
           });
 
-          debugPrint('Cleaning Banner Ad Loaded');
+          debugPrint('Cleaning Real Banner Ad Loaded');
         },
         onAdFailedToLoad: (ad, error) {
-          ad.dispose();
+          debugPrint(
+            'Cleaning Banner Error: ${error.code} ${error.message}',
+          );
 
-          debugPrint('Cleaning Banner Error: $error');
+          ad.dispose();
         },
       ),
     );
 
     banner.load();
   }
-
-  // START CLEANING
 
   Future<void> startCleaning() async {
     if (isRunning) return;
@@ -147,8 +143,6 @@ class _CleaningScreenState extends State<CleaningScreen>
     }
   }
 
-  // FINISH CLEANING
-
   Future<void> finishCleaning() async {
     await AudioService.instance.stopAudio();
 
@@ -160,8 +154,6 @@ class _CleaningScreenState extends State<CleaningScreen>
       isDone = true;
     });
   }
-
-  // STOP CLEANING
 
   Future<void> stopCleaning() async {
     controller.stop();
@@ -176,8 +168,6 @@ class _CleaningScreenState extends State<CleaningScreen>
       percentage = 1;
     });
   }
-
-  // CHANGE MODE
 
   void changeMode(CleaningMode newMode) {
     if (isRunning) return;
@@ -214,14 +204,11 @@ class _CleaningScreenState extends State<CleaningScreen>
         title: const Text('Speaker Cleaner Pro'),
         centerTitle: true,
       ),
-
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
-
           child: Column(
             children: [
-
               const SizedBox(height: 10),
 
               const Text(
@@ -245,8 +232,6 @@ class _CleaningScreenState extends State<CleaningScreen>
 
               const SizedBox(height: 25),
 
-              // MODE BUTTONS
-
               Row(
                 children: [
                   Expanded(
@@ -257,9 +242,7 @@ class _CleaningScreenState extends State<CleaningScreen>
                       accent,
                     ),
                   ),
-
                   const SizedBox(width: 12),
-
                   Expanded(
                     child: modeButton(
                       'Dust Removal',
@@ -273,15 +256,11 @@ class _CleaningScreenState extends State<CleaningScreen>
 
               const SizedBox(height: 35),
 
-              // SPEAKER ANIMATION
-
               AnimatedBuilder(
                 animation: controller,
-
                 builder: (context, child) {
                   return CustomPaint(
                     size: const Size(280, 280),
-
                     painter: CleaningPainter(
                       progress: controller.value,
                       isWater: isWater,
@@ -294,52 +273,37 @@ class _CleaningScreenState extends State<CleaningScreen>
 
               const SizedBox(height: 20),
 
-              // HIDE PERCENTAGE BEFORE START
-
               if (isRunning || isDone) ...[
                 Text(
                   '$percentage%',
                   style: TextStyle(
                     fontSize: 46,
                     fontWeight: FontWeight.bold,
-                    color: isDone
-                        ? Colors.greenAccent
-                        : accent,
+                    color: isDone ? Colors.greenAccent : accent,
                   ),
                 ),
 
                 const SizedBox(height: 8),
 
                 Text(
-                  isDone
-                      ? 'DONE ✓'
-                      : 'Cleaning in progress...',
+                  isDone ? 'DONE ✓' : 'Cleaning in progress...',
                   style: TextStyle(
                     fontSize: 17,
                     fontWeight: FontWeight.w600,
-                    color: isDone
-                        ? Colors.greenAccent
-                        : Colors.white70,
+                    color: isDone ? Colors.greenAccent : Colors.white70,
                   ),
                 ),
 
                 const SizedBox(height: 20),
 
-                // PROGRESS BAR
-
                 ClipRRect(
                   borderRadius: BorderRadius.circular(20),
-
                   child: LinearProgressIndicator(
                     value: percentage / 100,
                     minHeight: 12,
                     backgroundColor: const Color(0xFF26363C),
-
-                    valueColor:
-                        AlwaysStoppedAnimation<Color>(
-                      isDone
-                          ? Colors.greenAccent
-                          : accent,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      isDone ? Colors.greenAccent : accent,
                     ),
                   ),
                 ),
@@ -359,24 +323,17 @@ class _CleaningScreenState extends State<CleaningScreen>
 
               const SizedBox(height: 30),
 
-              // START BUTTON
-
               if (!isRunning && !isDone)
                 SizedBox(
                   width: double.infinity,
                   height: 55,
-
                   child: ElevatedButton.icon(
                     onPressed: startCleaning,
                     icon: const Icon(Icons.play_arrow),
-
                     label: const Text(
                       'START CLEANING',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: TextStyle(fontWeight: FontWeight.bold),
                     ),
-
                     style: ElevatedButton.styleFrom(
                       backgroundColor: accent,
                       foregroundColor: Colors.black,
@@ -384,19 +341,14 @@ class _CleaningScreenState extends State<CleaningScreen>
                   ),
                 ),
 
-              // STOP BUTTON
-
               if (isRunning)
                 SizedBox(
                   width: double.infinity,
                   height: 55,
-
                   child: ElevatedButton.icon(
                     onPressed: stopCleaning,
                     icon: const Icon(Icons.stop),
-
                     label: const Text('STOP CLEANING'),
-
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.red,
                       foregroundColor: Colors.white,
@@ -404,19 +356,14 @@ class _CleaningScreenState extends State<CleaningScreen>
                   ),
                 ),
 
-              // AGAIN BUTTON
-
               if (isDone)
                 SizedBox(
                   width: double.infinity,
                   height: 55,
-
                   child: ElevatedButton.icon(
                     onPressed: startCleaning,
                     icon: const Icon(Icons.refresh),
-
                     label: const Text('CLEAN AGAIN'),
-
                     style: ElevatedButton.styleFrom(
                       backgroundColor: accent,
                       foregroundColor: Colors.black,
@@ -430,7 +377,6 @@ class _CleaningScreenState extends State<CleaningScreen>
                 'Use moderate volume. Progress shows the '
                 'session timer, not actual water or dust removal.',
                 textAlign: TextAlign.center,
-
                 style: TextStyle(
                   color: Colors.white38,
                   fontSize: 12,
@@ -440,8 +386,6 @@ class _CleaningScreenState extends State<CleaningScreen>
           ),
         ),
       ),
-
-      // BOTTOM BANNER AD
 
       bottomNavigationBar:
           _isBannerAdLoaded && _bannerAd != null
@@ -458,8 +402,6 @@ class _CleaningScreenState extends State<CleaningScreen>
     );
   }
 
-  // MODE BUTTON
-
   Widget modeButton(
     String text,
     IconData icon,
@@ -469,32 +411,20 @@ class _CleaningScreenState extends State<CleaningScreen>
     final bool selected = mode == buttonMode;
 
     return OutlinedButton.icon(
-      onPressed: isRunning
-          ? null
-          : () => changeMode(buttonMode),
-
+      onPressed: isRunning ? null : () => changeMode(buttonMode),
       icon: Icon(icon, size: 18),
-
       label: Text(
         text,
         style: const TextStyle(fontSize: 12),
       ),
-
       style: OutlinedButton.styleFrom(
-        foregroundColor: selected
-            ? accent
-            : Colors.white70,
-
+        foregroundColor: selected ? accent : Colors.white70,
         backgroundColor: selected
             ? accent.withValues(alpha: 0.10)
             : Colors.transparent,
-
         side: BorderSide(
-          color: selected
-              ? accent
-              : Colors.white24,
+          color: selected ? accent : Colors.white24,
         ),
-
         padding: const EdgeInsets.symmetric(
           vertical: 14,
           horizontal: 5,
@@ -503,8 +433,6 @@ class _CleaningScreenState extends State<CleaningScreen>
     );
   }
 }
-
-// ANIMATION PAINTER
 
 class CleaningPainter extends CustomPainter {
   final double progress;
@@ -530,57 +458,33 @@ class CleaningPainter extends CustomPainter {
         ? const Color(0xFF00BFFF)
         : const Color(0xFF00D6B2);
 
-    // SOUND WAVES
-
     final wavePaint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 3;
 
     for (int i = 0; i < 4; i++) {
       final double radius =
-          65 + i * 18 +
-          (isRunning ? progress * 15 : 0);
+          65 + i * 18 + (isRunning ? progress * 15 : 0);
 
       wavePaint.color = color.withValues(
-        alpha: isRunning
-            ? 0.65 - i * 0.12
-            : 0.25,
+        alpha: isRunning ? 0.65 - i * 0.12 : 0.25,
       );
 
-      canvas.drawCircle(
-        center,
-        radius,
-        wavePaint,
-      );
+      canvas.drawCircle(center, radius, wavePaint);
     }
-
-    // SPEAKER BODY
 
     final speakerPaint = Paint()
       ..color = const Color(0xFF122128);
 
-    canvas.drawCircle(
-      center,
-      58,
-      speakerPaint,
-    );
+    canvas.drawCircle(center, 58, speakerPaint);
 
     final borderPaint = Paint()
       ..color = color
       ..style = PaintingStyle.stroke
       ..strokeWidth = 3;
 
-    canvas.drawCircle(
-      center,
-      58,
-      borderPaint,
-    );
-
-    canvas.drawCircle(
-      center,
-      35,
-      borderPaint,
-    );
+    canvas.drawCircle(center, 58, borderPaint);
+    canvas.drawCircle(center, 35, borderPaint);
 
     canvas.drawCircle(
       center,
@@ -588,20 +492,15 @@ class CleaningPainter extends CustomPainter {
       Paint()..color = color,
     );
 
-    // PARTICLES
-
     if (isRunning || isDone) {
       for (int i = 0; i < 18; i++) {
-        final double angle =
-            i * (math.pi * 2 / 18);
+        final double angle = i * (math.pi * 2 / 18);
 
         final double movement = isDone
             ? 1
-            : (progress * 1.5 +
-                (i % 4) * 0.12) % 1;
+            : (progress * 1.5 + (i % 4) * 0.12) % 1;
 
-        final double radius =
-            75 + movement * 65;
+        final double radius = 75 + movement * 65;
 
         final Offset particle = Offset(
           center.dx + math.cos(angle) * radius,
@@ -616,10 +515,7 @@ class CleaningPainter extends CustomPainter {
         if (isWater) {
           final path = Path();
 
-          path.moveTo(
-            particle.dx,
-            particle.dy - 7,
-          );
+          path.moveTo(particle.dx, particle.dy - 7);
 
           path.quadraticBezierTo(
             particle.dx + 8,
@@ -635,10 +531,7 @@ class CleaningPainter extends CustomPainter {
             particle.dy - 7,
           );
 
-          canvas.drawPath(
-            path,
-            particlePaint,
-          );
+          canvas.drawPath(path, particlePaint);
         } else {
           canvas.drawCircle(
             particle,
@@ -651,13 +544,10 @@ class CleaningPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(
-    covariant CleaningPainter oldDelegate,
-  ) {
+  bool shouldRepaint(covariant CleaningPainter oldDelegate) {
     return oldDelegate.progress != progress ||
         oldDelegate.isWater != isWater ||
         oldDelegate.isRunning != isRunning ||
         oldDelegate.isDone != isDone;
   }
 }
-
