@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
@@ -15,9 +16,9 @@ class _HomeScreenState extends State<HomeScreen> {
   BannerAd? _bannerAd;
   bool _isBannerLoaded = false;
 
-  // Google official test banner ID
+  // Real AdMob Home Banner ID
   static const String _bannerAdUnitId =
-      'ca-app-pub-3940256099942544/6300978111';
+      'ca-app-pub-6724668039220554/1019946859';
 
   @override
   void initState() {
@@ -42,10 +43,12 @@ class _HomeScreenState extends State<HomeScreen> {
             _isBannerLoaded = true;
           });
 
-          debugPrint('Banner Ad loaded successfully');
+          debugPrint('Real Home Banner Ad loaded successfully');
         },
         onAdFailedToLoad: (ad, error) {
-          debugPrint('Banner Ad failed: ${error.code} ${error.message}');
+          debugPrint(
+            'Home Banner Ad failed: ${error.code} ${error.message}',
+          );
           ad.dispose();
         },
       ),
@@ -125,7 +128,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
 
-          // Banner Ad
+          // Real AdMob Banner
           if (_isBannerLoaded && _bannerAd != null)
             Container(
               alignment: Alignment.center,
