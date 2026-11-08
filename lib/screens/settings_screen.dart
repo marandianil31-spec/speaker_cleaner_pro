@@ -1,4 +1,7 @@
+
 import 'package:flutter/material.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
+
 import '../services/audio_service.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -10,6 +13,52 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   double volume = 0.7;
+
+  BannerAd? _bannerAd;
+  bool _isBannerAdLoaded = false;
+
+  // Google official test banner ID
+  static const String _bannerAdUnitId =
+      'ca-app-pub-3940256099942544/6300978111';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBannerAd();
+  }
+
+  void _loadBannerAd() {
+    _bannerAd = BannerAd(
+      adUnitId: _bannerAdUnitId,
+      request: const AdRequest(),
+      size: AdSize.banner,
+      listener: BannerAdListener(
+        onAdLoaded: (ad) {
+          if (!mounted) {
+            ad.dispose();
+            return;
+          }
+
+          setState(() {
+            _isBannerAdLoaded = true;
+          });
+        },
+        onAdFailedToLoad: (ad, error) {
+          debugPrint('Settings Banner Ad failed: $error');
+          ad.dispose();
+          _bannerAd = null;
+        },
+      ),
+    );
+
+    _bannerAd!.load();
+  }
+
+  @override
+  void dispose() {
+    _bannerAd?.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -43,6 +92,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ],
         ),
       ),
+      bottomNavigationBar: _isBannerAdLoaded && _bannerAd != null
+          ? SafeArea(
+              child: SizedBox(
+                width: _bannerAd!.size.width.toDouble(),
+                height: _bannerAd!.size.height.toDouble(),
+                child: Center(
+                  child: AdWidget(ad: _bannerAd!),
+                ),
+              ),
+            )
+          : null,
     );
   }
 }
