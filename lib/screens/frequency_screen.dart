@@ -12,28 +12,24 @@ class FrequencyScreen extends StatefulWidget {
 }
 
 class _FrequencyScreenState extends State<FrequencyScreen> {
-
   static const List<int> frequencies = [
     60, 80, 100, 165, 250, 500, 1000, 2000, 4000
   ];
 
   int? selectedFrequency;
 
-  // ADMOB BANNER
-
   BannerAd? _bannerAd;
   bool _isBannerAdLoaded = false;
 
+  // Real AdMob Top Banner ID
   static const String _bannerAdUnitId =
-      'ca-app-pub-3940256099942544/6300978111';
+      'ca-app-pub-6724668039220554/2205955881';
 
   @override
   void initState() {
     super.initState();
     _loadBannerAd();
   }
-
-  // LOAD BANNER AD
 
   void _loadBannerAd() {
     final banner = BannerAd(
@@ -52,19 +48,19 @@ class _FrequencyScreenState extends State<FrequencyScreen> {
             _isBannerAdLoaded = true;
           });
 
-          debugPrint('Frequency Banner Ad Loaded');
+          debugPrint('Frequency Real Banner Ad Loaded');
         },
         onAdFailedToLoad: (ad, error) {
+          debugPrint(
+            'Frequency Banner Error: ${error.code} ${error.message}',
+          );
           ad.dispose();
-          debugPrint('Frequency Banner Error: $error');
         },
       ),
     );
 
     banner.load();
   }
-
-  // PLAY FREQUENCY
 
   Future<void> playFrequency(int frequency) async {
     try {
@@ -87,8 +83,6 @@ class _FrequencyScreenState extends State<FrequencyScreen> {
       );
     }
   }
-
-  // STOP FREQUENCY
 
   Future<void> stopFrequency() async {
     await AudioService.instance.stopAudio();
@@ -113,11 +107,9 @@ class _FrequencyScreenState extends State<FrequencyScreen> {
       appBar: AppBar(
         title: const Text('Frequency Generator'),
       ),
-
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-
           const Text(
             'Select Frequency',
             style: TextStyle(
@@ -128,45 +120,39 @@ class _FrequencyScreenState extends State<FrequencyScreen> {
 
           const SizedBox(height: 15),
 
-          ...frequencies.map(
-            (frequency) {
-              final selected = selectedFrequency == frequency;
+          ...frequencies.map((frequency) {
+            final selected = selectedFrequency == frequency;
 
-              return Card(
-                color: const Color(0xFF122128),
-
-                child: ListTile(
-                  leading: Icon(
-                    Icons.graphic_eq,
+            return Card(
+              color: const Color(0xFF122128),
+              child: ListTile(
+                leading: Icon(
+                  Icons.graphic_eq,
+                  color: selected
+                      ? Colors.greenAccent
+                      : const Color(0xFF00D6B2),
+                ),
+                title: Text(
+                  '$frequency Hz',
+                  style: TextStyle(
                     color: selected
                         ? Colors.greenAccent
-                        : const Color(0xFF00D6B2),
+                        : Colors.white,
+                    fontWeight: FontWeight.bold,
                   ),
-
-                  title: Text(
-                    '$frequency Hz',
-                    style: TextStyle(
-                      color: selected
-                          ? Colors.greenAccent
-                          : Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-
-                  trailing: Icon(
-                    selected
-                        ? Icons.equalizer
-                        : Icons.play_circle,
-                    color: const Color(0xFF00D6B2),
-                  ),
-
-                  onTap: () {
-                    playFrequency(frequency);
-                  },
                 ),
-              );
-            },
-          ),
+                trailing: Icon(
+                  selected
+                      ? Icons.equalizer
+                      : Icons.play_circle,
+                  color: const Color(0xFF00D6B2),
+                ),
+                onTap: () {
+                  playFrequency(frequency);
+                },
+              ),
+            );
+          }),
 
           const SizedBox(height: 20),
 
@@ -182,8 +168,6 @@ class _FrequencyScreenState extends State<FrequencyScreen> {
           ),
         ],
       ),
-
-      // BOTTOM BANNER AD
 
       bottomNavigationBar:
           _isBannerAdLoaded && _bannerAd != null
