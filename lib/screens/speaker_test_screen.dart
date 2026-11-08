@@ -1,5 +1,6 @@
-
 import 'package:flutter/material.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
+
 import '../services/audio_service.dart';
 
 class SpeakerTestScreen extends StatefulWidget {
@@ -24,6 +25,14 @@ class _SpeakerTestScreenState extends State<SpeakerTestScreen>
     60, 80, 100, 165, 250, 500, 1000, 2000, 4000
   ];
 
+  // ADMOB BANNER
+
+  BannerAd? _bannerAd;
+  bool _isBannerAdLoaded = false;
+
+  static const String _bannerAdUnitId =
+      'ca-app-pub-3940256099942544/6300978111';
+
   @override
   void initState() {
     super.initState();
@@ -32,7 +41,42 @@ class _SpeakerTestScreenState extends State<SpeakerTestScreen>
       vsync: this,
       duration: const Duration(milliseconds: 1200),
     )..repeat(reverse: true);
+
+    _loadBannerAd();
   }
+
+  // LOAD BANNER AD
+
+  void _loadBannerAd() {
+    final banner = BannerAd(
+      adUnitId: _bannerAdUnitId,
+      size: AdSize.banner,
+      request: const AdRequest(),
+      listener: BannerAdListener(
+        onAdLoaded: (ad) {
+          if (!mounted) {
+            ad.dispose();
+            return;
+          }
+
+          setState(() {
+            _bannerAd = ad as BannerAd;
+            _isBannerAdLoaded = true;
+          });
+
+          debugPrint('Speaker Test Banner Loaded');
+        },
+        onAdFailedToLoad: (ad, error) {
+          ad.dispose();
+          debugPrint('Speaker Test Banner Error: $error');
+        },
+      ),
+    );
+
+    banner.load();
+  }
+
+  // PLAY TEST
 
   Future<void> playTest(
     String fileName,
@@ -64,6 +108,8 @@ class _SpeakerTestScreenState extends State<SpeakerTestScreen>
     }
   }
 
+  // STOP TEST
+
   Future<void> stopTest() async {
     await AudioService.instance.stopAudio();
 
@@ -79,6 +125,7 @@ class _SpeakerTestScreenState extends State<SpeakerTestScreen>
   @override
   void dispose() {
     animationController.dispose();
+    _bannerAd?.dispose();
     AudioService.instance.stopAudio();
     super.dispose();
   }
@@ -381,8 +428,25 @@ class _SpeakerTestScreenState extends State<SpeakerTestScreen>
           ),
         ),
       ),
+
+      // BOTTOM BANNER AD
+
+      bottomNavigationBar:
+          _isBannerAdLoaded && _bannerAd != null
+              ? SafeArea(
+                  child: SizedBox(
+                    width: _bannerAd!.size.width.toDouble(),
+                    height: _bannerAd!.size.height.toDouble(),
+                    child: Center(
+                      child: AdWidget(ad: _bannerAd!),
+                    ),
+                  ),
+                )
+              : null,
     );
   }
+
+  // CHANNEL BUTTON
 
   Widget channelButton(
     String title,
@@ -405,3 +469,4 @@ class _SpeakerTestScreenState extends State<SpeakerTestScreen>
     );
   }
 }
+
