@@ -1,3 +1,4 @@
+
 name: Build Speaker Cleaner Pro APK
 
 on:
@@ -111,44 +112,23 @@ jobs:
 
           echo "All required files found."
 
+      - name: Upgrade AdMob Dependency
+        run: |
+          flutter pub upgrade google_mobile_ads
+          flutter pub deps | grep -i -A 5 google_mobile_ads
+
       - name: Flutter Pub Get
         run: flutter pub get
 
-      - name: Verify AdMob Dependency
+      - name: Verify AdMob Version
         run: |
-          grep -n "google_mobile_ads" pubspec.yaml
-          flutter pub deps | grep -i -A 3 google_mobile_ads
+          grep -n -A 5 "google_mobile_ads:" pubspec.lock
 
-      - name: Inspect Android SDK Configuration
+      - name: Inspect Android Manifest
         run: |
-          echo "========== APP GRADLE =========="
-
-          if [ -f android/app/build.gradle.kts ]; then
-            cat android/app/build.gradle.kts
-          elif [ -f android/app/build.gradle ]; then
-            cat android/app/build.gradle
-          fi
-
-          echo "========== MANIFEST =========="
           cat android/app/src/main/AndroidManifest.xml
 
-      - name: Find WorkManager Dependency Source
-        run: |
-          cd android
-
-          echo "========== WORKMANAGER =========="
-
-          ./gradlew :app:dependencyInsight \
-            --configuration releaseRuntimeClasspath \
-            --dependency androidx.work:work-runtime
-
-          echo "========== ROOM =========="
-
-          ./gradlew :app:dependencyInsight \
-            --configuration releaseRuntimeClasspath \
-            --dependency androidx.room:room-runtime
-
-      - name: Inspect All Android Dependencies
+      - name: Inspect Android Dependencies
         run: |
           cd android
 
