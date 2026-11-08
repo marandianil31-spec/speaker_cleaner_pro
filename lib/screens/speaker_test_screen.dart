@@ -13,7 +13,6 @@ class SpeakerTestScreen extends StatefulWidget {
 
 class _SpeakerTestScreenState extends State<SpeakerTestScreen>
     with SingleTickerProviderStateMixin {
-
   late AnimationController animationController;
 
   double volume = 0.7;
@@ -25,13 +24,12 @@ class _SpeakerTestScreenState extends State<SpeakerTestScreen>
     60, 80, 100, 165, 250, 500, 1000, 2000, 4000
   ];
 
-  // ADMOB BANNER
-
+  // REAL ADMOB BANNER
   BannerAd? _bannerAd;
   bool _isBannerAdLoaded = false;
 
   static const String _bannerAdUnitId =
-      'ca-app-pub-3940256099942544/6300978111';
+      'ca-app-pub-6724668039220554/2205955881';
 
   @override
   void initState() {
@@ -45,8 +43,7 @@ class _SpeakerTestScreenState extends State<SpeakerTestScreen>
     _loadBannerAd();
   }
 
-  // LOAD BANNER AD
-
+  // LOAD REAL BANNER AD
   void _loadBannerAd() {
     final banner = BannerAd(
       adUnitId: _bannerAdUnitId,
@@ -64,20 +61,27 @@ class _SpeakerTestScreenState extends State<SpeakerTestScreen>
             _isBannerAdLoaded = true;
           });
 
-          debugPrint('Speaker Test Banner Loaded');
+          debugPrint('Speaker Test Real Banner Loaded');
         },
         onAdFailedToLoad: (ad, error) {
-          ad.dispose();
           debugPrint('Speaker Test Banner Error: $error');
+          ad.dispose();
+
+          if (mounted) {
+            setState(() {
+              _bannerAd = null;
+              _isBannerAdLoaded = false;
+            });
+          }
         },
       ),
     );
 
+    _bannerAd = banner;
     banner.load();
   }
 
   // PLAY TEST
-
   Future<void> playTest(
     String fileName,
     String testName, {
@@ -109,7 +113,6 @@ class _SpeakerTestScreenState extends State<SpeakerTestScreen>
   }
 
   // STOP TEST
-
   Future<void> stopTest() async {
     await AudioService.instance.stopAudio();
 
@@ -141,11 +144,9 @@ class _SpeakerTestScreenState extends State<SpeakerTestScreen>
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(18),
-
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-
               const Text(
                 'AUDIO TESTING CENTER',
                 style: TextStyle(
@@ -168,22 +169,17 @@ class _SpeakerTestScreenState extends State<SpeakerTestScreen>
               const SizedBox(height: 25),
 
               // ANIMATED SPEAKER
-
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(25),
-
                 decoration: BoxDecoration(
                   color: const Color(0xFF122128),
                   borderRadius: BorderRadius.circular(22),
                 ),
-
                 child: Column(
                   children: [
-
                     AnimatedBuilder(
                       animation: animationController,
-
                       builder: (context, child) {
                         final scale = isPlaying
                             ? 1 + animationController.value * 0.12
@@ -228,12 +224,10 @@ class _SpeakerTestScreenState extends State<SpeakerTestScreen>
                     SizedBox(
                       width: double.infinity,
                       height: 48,
-
                       child: ElevatedButton.icon(
                         onPressed: stopTest,
                         icon: const Icon(Icons.stop),
                         label: const Text('STOP TEST'),
-
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.red,
                           foregroundColor: Colors.white,
@@ -247,7 +241,6 @@ class _SpeakerTestScreenState extends State<SpeakerTestScreen>
               const SizedBox(height: 28),
 
               // SPEAKER CHANNEL TEST
-
               const Text(
                 'Speaker Channel Test',
                 style: TextStyle(
@@ -294,7 +287,6 @@ class _SpeakerTestScreenState extends State<SpeakerTestScreen>
               const SizedBox(height: 28),
 
               // FREQUENCY TEST
-
               const Text(
                 'Frequency Generator',
                 style: TextStyle(
@@ -315,9 +307,7 @@ class _SpeakerTestScreenState extends State<SpeakerTestScreen>
               GridView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-
                 itemCount: frequencies.length,
-
                 gridDelegate:
                     const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 3,
@@ -325,7 +315,6 @@ class _SpeakerTestScreenState extends State<SpeakerTestScreen>
                   mainAxisSpacing: 10,
                   childAspectRatio: 1.5,
                 ),
-
                 itemBuilder: (context, index) {
                   final frequency = frequencies[index];
 
@@ -334,7 +323,6 @@ class _SpeakerTestScreenState extends State<SpeakerTestScreen>
 
                   return InkWell(
                     borderRadius: BorderRadius.circular(12),
-
                     onTap: () {
                       playTest(
                         'tone_$frequency.wav',
@@ -342,25 +330,20 @@ class _SpeakerTestScreenState extends State<SpeakerTestScreen>
                         frequency: frequency,
                       );
                     },
-
                     child: Container(
                       alignment: Alignment.center,
-
                       decoration: BoxDecoration(
                         color: selected
                             ? const Color(0xFF00D6B2)
                                 .withValues(alpha: 0.18)
                             : const Color(0xFF122128),
-
                         borderRadius: BorderRadius.circular(12),
-
                         border: Border.all(
                           color: selected
                               ? const Color(0xFF00D6B2)
                               : Colors.white12,
                         ),
                       ),
-
                       child: Text(
                         '$frequency Hz',
                         style: TextStyle(
@@ -378,7 +361,6 @@ class _SpeakerTestScreenState extends State<SpeakerTestScreen>
               const SizedBox(height: 28),
 
               // VOLUME CONTROL
-
               const Text(
                 'Test Volume',
                 style: TextStyle(
@@ -393,7 +375,6 @@ class _SpeakerTestScreenState extends State<SpeakerTestScreen>
                 max: 1,
                 divisions: 10,
                 activeColor: const Color(0xFF00D6B2),
-
                 onChanged: (value) {
                   setState(() {
                     volume = value;
@@ -429,8 +410,7 @@ class _SpeakerTestScreenState extends State<SpeakerTestScreen>
         ),
       ),
 
-      // BOTTOM BANNER AD
-
+      // BOTTOM REAL BANNER AD
       bottomNavigationBar:
           _isBannerAdLoaded && _bannerAd != null
               ? SafeArea(
@@ -447,7 +427,6 @@ class _SpeakerTestScreenState extends State<SpeakerTestScreen>
   }
 
   // CHANNEL BUTTON
-
   Widget channelButton(
     String title,
     IconData icon,
@@ -457,10 +436,8 @@ class _SpeakerTestScreenState extends State<SpeakerTestScreen>
       onPressed: () {
         playTest(fileName, title);
       },
-
       icon: Icon(icon),
       label: Text(title),
-
       style: ElevatedButton.styleFrom(
         backgroundColor: const Color(0xFF122128),
         foregroundColor: const Color(0xFF00D6B2),
