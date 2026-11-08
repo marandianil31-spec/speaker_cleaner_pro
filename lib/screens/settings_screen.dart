@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
@@ -17,9 +16,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   BannerAd? _bannerAd;
   bool _isBannerAdLoaded = false;
 
-  // Google official test banner ID
+  // Real AdMob Top Banner ID
   static const String _bannerAdUnitId =
-      'ca-app-pub-3940256099942544/6300978111';
+      'ca-app-pub-6724668039220554/2205955881';
 
   @override
   void initState() {
@@ -46,7 +45,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
         onAdFailedToLoad: (ad, error) {
           debugPrint('Settings Banner Ad failed: $error');
           ad.dispose();
-          _bannerAd = null;
+
+          if (mounted) {
+            setState(() {
+              _bannerAd = null;
+              _isBannerAdLoaded = false;
+            });
+          }
         },
       ),
     );
@@ -106,3 +111,4 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 }
+
