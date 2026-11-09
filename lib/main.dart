@@ -1,6 +1,8 @@
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
 
 import 'screens/home_screen.dart';
 import 'screens/cleaning_screen.dart';
@@ -40,6 +42,11 @@ class SpeakerCleanerApp extends StatelessWidget {
         ),
         useMaterial3: true,
       ),
+      builder: (context, child) {
+        return InternetGate(
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
       initialRoute: '/',
       routes: {
         '/': (context) => const MainScreen(),
@@ -52,6 +59,144 @@ class SpeakerCleanerApp extends StatelessWidget {
         '/about': (context) => const AboutScreen(),
       },
     );
+  }
+}
+
+class InternetGate extends StatefulWidget {
+  final Widget child;
+
+  const InternetGate({
+    super.key,
+    required this.child,
+  });
+
+  @override
+  State<InternetGate> createState() => _InternetGateState();
+}
+
+class _InternetGateState extends State<InternetGate> {
+  bool? hasInternet;
+  bool checking = true;
+
+  StreamSubscription<InternetStatus>? subscription;
+
+  @override
+  void initState() {
+    super.initState();
+    checkInternet();
+
+    subscription =
+        InternetConnection().onStatusChange.listen((status) {
+      if (!mounted) return;
+
+      setState(() {
+        hasInternet = status == InternetStatus.connected;
+        checking = false;
+      });
+    });
+  }
+
+  Future<void> checkInternet() async {
+    if (mounted) {
+      setState(() {
+        checking = true;
+      });
+    }
+
+    try {
+      final result =
+          await InternetConnection().hasInternetAccess;
+
+      if (!mounted) return;
+
+      setState(() {
+        hasInternet = result;
+        checking = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        hasInternet = false;
+        checking = false;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    subscription?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (checking || hasInternet == null) {
+      return const Scaffold(
+        backgroundColor: Color(0xFF081116),
+        body: Center(
+          child: CircularProgressIndicator(
+            color: Color(0xFF00D6B2),
+          ),
+        ),
+      );
+    }
+
+    if (hasInternet == false) {
+      return Scaffold(
+        backgroundColor: const Color(0xFF081116),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.wifi_off_rounded,
+                  size: 75,
+                  color: Color(0xFF00D6B2),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'No Internet Connection',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 23,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'Please connect to the internet to use Speaker Cleaner Pro.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 15,
+                  ),
+                ),
+                const SizedBox(height: 25),
+                ElevatedButton.icon(
+                  onPressed: checkInternet,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Retry'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF00D6B2),
+                    foregroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 30,
+                      vertical: 14,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return widget.child;
   }
 }
 
@@ -112,3 +257,4 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 }
+
